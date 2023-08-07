@@ -10,5 +10,6 @@ type RuntimeError =
     | UnknownIdent
     | FunctionNotFound
     | NotAFunction
+    | PatternMatchingFailed
 
 type RuntimeResult<'t> = Result<'t, RuntimeError>

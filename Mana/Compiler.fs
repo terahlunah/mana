@@ -61,9 +61,11 @@ and compileBlock =
             })
       }
 
-and compileExprs =
+and compileExprs exprs = List.traverseResultM compileExpr exprs
+
+and compileExprs2 =
     function
-    | [] -> compileUnit |> Result.map List.singleton
+    | [] -> Ok []
     | [ expr ] -> compileExpr expr |> Result.map List.singleton
     | head :: tail -> result {
         let! headCode = compileExpr head
@@ -113,7 +115,7 @@ and compileClosure (argsNames: string list) body = result {
                     let scope =
                         (argsNames, args)
                         ||> List.zip
-                        |> List.fold (fun env (k, v) -> Env.set k v env) (Env.scoped env)
+                        |> List.fold (fun env (k, v) -> Env.set k v env) (Env.localScope env)
 
                     let! env, v = body scope
                     return env, v
@@ -124,6 +126,7 @@ and compileClosure (argsNames: string list) body = result {
 }
 
 and compileList exprs = result {
+
     let! exprs = compileExprs exprs
 
     return
@@ -134,7 +137,7 @@ and compileList exprs = result {
             for expr in exprs do
                 let! exprEnv, exprValue = expr env
                 env <- exprEnv
-                exprValues <- exprValue :: exprValues
+                exprValues <- exprValues @ [ exprValue ]
 
             let v = Value.List exprValues
 
@@ -166,6 +169,46 @@ and compileTable pairs = result {
         })
 }
 
+and compileMatch expr (cases: MatchCase list) = result {
+    let! exprCode = compileExpr expr
+    let patterns = cases |> List.map (fun x -> x.pattern)
+    let! codes = cases |> List.traverseResultM (fun x -> compileExpr x.body)
+
+    return
+        (fun env -> result {
+            let! env, value = exprCode env
+
+            return!
+                List.zip patterns codes
+                |> findMatch (env |> Env.localScope) value
+        })
+}
+
+and findMatch env value cases =
+    match cases with
+    | [] -> Error RuntimeError.PatternMatchingFailed
+    | case :: cases ->
+        let pattern, code = case
+        let hasMatch, env = matchCase env value pattern
+        if hasMatch then code env else findMatch env value cases
+
+and matchCase env value (pattern: Pattern) : bool * Env<Value> =
+    match pattern with
+    | Underscore -> true, env
+    | BoolPattern b -> value |> Value.isBool b, env
+    | NumPattern n -> value |> Value.isNum n, env
+    | StrPattern s -> value |> Value.isStr s, env
+    | IdentPattern i -> true, Env.set i value env
+    | ListPattern patterns ->
+        match value with
+        | Value.List values ->
+            List.zip patterns values
+            |> List.map (fun (pattern, value) -> matchCase env value pattern)
+            |> List.fold
+                (fun (accMatch, accEnv) (caseMatch, caseEnv) -> accMatch && caseMatch, Env.merge accEnv caseEnv)
+                (true, Env.empty)
+        | _ -> false, env
+
 and compileExpr (expr: Expr) : CompileResult<Code> =
     match expr with
     | Unit -> compileUnit
@@ -175,7 +218,7 @@ and compileExpr (expr: Expr) : CompileResult<Code> =
     | Ident name -> compileIdent name
     | Call(name, args) -> compileCall name args
     | Closure(args, body) -> compileClosure args body
-    | Match(expr, matchCases) -> failwith "todo"
+    | Match(expr, cases) -> compileMatch expr cases
     | Block exprs -> compileBlock exprs
     | List exprs -> compileList exprs
     | Table pairs -> compileTable pairs

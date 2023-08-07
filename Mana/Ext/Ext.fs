@@ -21,3 +21,6 @@ module Result =
 
 module Tuple3 =
     let map f (a, b, c) = (f a, f b, f c)
+
+module Map =
+    let merge m1 m2 = Map.fold (fun acc key value -> Map.add key value acc) m1 m2

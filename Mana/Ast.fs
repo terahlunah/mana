@@ -10,7 +10,7 @@ type Expr =
     | Ident of string
     | Call of name: string * args: Expr list
     | Closure of args: Argument list * body: Expr
-    | Match of Expr * MatchCase list
+    | Match of expr: Expr * cases: MatchCase list
     | Block of Expr list
     | List of Expr list
     | Table of (string * Expr) list
@@ -25,10 +25,11 @@ and MatchCase = {
 }
 
 and Pattern =
-    | NumberPattern of float
-    | StringPattern of string
-    | IdentPattern of string
-    // | ListPattern of string
+    | BoolPattern of b: bool
+    | NumPattern of n: float
+    | StrPattern of s: string
+    | IdentPattern of i: string
+    | ListPattern of Pattern list
     | Underscore
 
 type Module = {
