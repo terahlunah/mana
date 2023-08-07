@@ -37,8 +37,8 @@ and compileIf condExpr thenExpr elseExpr = result {
 
             let! branch =
                 match condTest with
-                | Bool true -> Ok thenCode
-                | Bool false -> Ok elseCode
+                | Value.Bool true -> Ok thenCode
+                | Value.Bool false -> Ok elseCode
                 | _ -> Error RuntimeError.InvalidArguments
 
             let! env, branchValue = branch env
@@ -79,7 +79,7 @@ and compileCall name args = result {
         (fun env -> result {
             let! handler =
                 match (Env.get name env) with
-                | Some(Native handler) -> Ok handler
+                | Some(Fun handler) -> Ok handler
                 | Some _ -> Error RuntimeError.NotAFunction
                 | None -> Error RuntimeError.FunctionNotFound
 
@@ -91,7 +91,76 @@ and compileCall name args = result {
                 env <- argEnv
                 argsValues <- argValue :: argsValues
 
-            let! v = handler argsValues
+            let! env, v = handler env argsValues
+
+            return env, v
+        })
+}
+
+and compileClosure (argsNames: string list) body = result {
+    let! body = compileExpr body
+
+    return
+        (fun env -> result {
+            let closure =
+                Value.Fun(fun env (args: Value list) -> result {
+
+                    // Check arity
+                    if argsNames.Length <> args.Length then
+                        return! Error RuntimeError.InvalidArgumentCount
+
+                    // Prepare env with args
+                    let scope =
+                        (argsNames, args)
+                        ||> List.zip
+                        |> List.fold (fun env (k, v) -> Env.set k v env) (Env.scoped env)
+
+                    let! env, v = body scope
+                    return env, v
+                })
+
+            return env, closure
+        })
+}
+
+and compileList exprs = result {
+    let! exprs = compileExprs exprs
+
+    return
+        (fun env -> result {
+            let mutable exprValues = List.empty
+            let mutable env = env
+
+            for expr in exprs do
+                let! exprEnv, exprValue = expr env
+                env <- exprEnv
+                exprValues <- exprValue :: exprValues
+
+            let v = Value.List exprValues
+
+            return env, v
+        })
+}
+
+and compileTable pairs = result {
+
+    let keys = pairs |> List.map fst
+    let values = pairs |> List.map snd
+    let! values = compileExprs values
+
+    let pairs = List.zip keys values
+
+    return
+        (fun env -> result {
+            let mutable items = Map.empty
+            let mutable env = env
+
+            for key, value in pairs do
+                let! exprEnv, value = value env
+                env <- exprEnv
+                items <- items |> Map.add key value
+
+            let v = Value.Table items
 
             return env, v
         })
@@ -99,15 +168,16 @@ and compileCall name args = result {
 
 and compileExpr (expr: Expr) : CompileResult<Code> =
     match expr with
-    | Expr.Unit -> compileUnit
-    | NumberLiteral n -> Ok(fun env -> Ok(env, n |> Num))
-    | StringLiteral s -> Ok(fun env -> Ok(env, s |> Str))
+    | Unit -> compileUnit
+    | Bool b -> Ok(fun env -> Ok(env, b |> Value.Bool))
+    | Num n -> Ok(fun env -> Ok(env, n |> Value.Num))
+    | Str s -> Ok(fun env -> Ok(env, s |> Value.Str))
     | Ident name -> compileIdent name
     | Call(name, args) -> compileCall name args
-    | Lambda(l, expr) -> failwith "todo"
+    | Closure(args, body) -> compileClosure args body
     | Match(expr, matchCases) -> failwith "todo"
     | Block exprs -> compileBlock exprs
-    | List patterns -> failwith "todo"
-    | Dict tuples -> failwith "todo"
+    | List exprs -> compileList exprs
+    | Table pairs -> compileTable pairs
     | If(condExpr, thenExpr, elseExpr) -> compileIf condExpr thenExpr elseExpr
     | Let(s, expr) -> compileLet s expr

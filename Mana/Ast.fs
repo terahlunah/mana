@@ -4,17 +4,18 @@ open Mana
 
 type Expr =
     | Unit
-    | NumberLiteral of float
-    | StringLiteral of string
+    | Bool of b: bool
+    | Num of n: float
+    | Str of s: string
     | Ident of string
     | Call of name: string * args: Expr list
-    | Lambda of Argument list * Expr
+    | Closure of args: Argument list * body: Expr
     | Match of Expr * MatchCase list
     | Block of Expr list
-    | List of Pattern list
-    | Dict of (string * Pattern) list
+    | List of Expr list
+    | Table of (string * Expr) list
     | If of Expr * Expr * Expr
-    | Let of string * Expr
+    | Let of name: string * expr: Expr
 
 and Argument = string
 

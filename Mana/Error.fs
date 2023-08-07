@@ -6,6 +6,7 @@ type CompileResult<'t> = Result<'t, CompileError>
 
 type RuntimeError =
     | InvalidArguments
+    | InvalidArgumentCount
     | UnknownIdent
     | FunctionNotFound
     | NotAFunction

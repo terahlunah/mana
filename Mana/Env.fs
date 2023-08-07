@@ -11,7 +11,7 @@ module Env =
         parent = None
     }
 
-    let scoped env = { empty with parent = env }
+    let scoped env = { empty with parent = Some env }
 
     let set k v env = { env with bindings = env.bindings |> Map.add k v }
 

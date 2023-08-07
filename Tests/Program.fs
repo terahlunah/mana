@@ -1,12 +1,19 @@
 ﻿open Mana
 open Mana.Ast
+open FsToolkit.ErrorHandling
 
-let env = Env.empty |> Env.set "add" (Value.Native Mana.Std.Core.add)
+let env = Env.empty |> Env.set "add" (Value.Fun Mana.Std.Core.add)
 
-let ast = Expr.Call("add", [ NumberLiteral 2; NumberLiteral 3 ])
+let ast =
+    Expr.Block [
+        Let("f", Closure([ "a"; "b" ], Call("add", [ Ident "a"; Ident "b" ])))
+        Call("f", [ Num 2; Num 3 ])
+    ]
 
-let code = Compiler.compileExpr ast
+let value =
+    Compiler.compileExpr ast
+    |> Result.anyBind (fun code -> code env)
 
-match code with
-| Ok code -> printfn $"%A{code env}"
-| Error err -> printfn $"%A{err}"
+match value with
+| Ok v -> debug v
+| Error err -> debug err
