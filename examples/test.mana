@@ -1,0 +1,90 @@
+
+meta [
+    author: "Terah"
+    title: "Titre"
+]
+
+
+paint = { canvas =>
+
+}
+
+def paint canvas =
+    triangles = range 2 |> List.map { makeTriangle } 
+
+
+
+strokeStyle "cyan"
+
+times 10 {
+    translate 250 250
+    rotate (/ PI 9)
+    translate -250 -250
+    beginPath
+    moveTo 150 150
+    lineTo 150 350
+    lineTo 350 350
+    lineTo 350 150
+    closePath
+    stroke
+}
+
+
+# Arrays
+[1, 2, 3, 4]
+
+# Dict
+[age: 2, name: "Tom"]
+
+#module
+mod Option
+    def some x = [some: x] 
+    def none = [none: ()]
+    def map f o =
+        match o with # Matching over Dict
+            [some: s] ->  some (f o)
+            [none: _] ->  o
+    def okOr e o = 
+        match o with
+            [some: s] ->  Result.ok s
+            [none: _] ->  Result.err e
+ 
+
+mod Result
+    def ok x = [ok: x]
+    def err e = [err: e]
+    def map f r = 
+        match r with
+            [ok: x] -> ok (f x)
+            [err: _] ->  r
+    def mapErr f r =
+        match r with
+            [ok: _] -> r
+            [err: e] -> err (f e)
+    def ok r =
+        match r with
+            [ok: x] -> Option.some x
+            [err: _] -> Option.none
+ 
+
+def checkedDiv dividend divisor = 
+    if divisor == 0 then
+        Option.none
+    else
+        Option.some (/ dividend divisor)
+
+def tryDiv dividend divisor =
+    match (checkedDiv dividend divisor) with
+        [none: _] -> println $"{divident} / {divisor} failed"
+        [some: quotient] -> println $"{divident} / {divisor} = {quotient}"
+    
+def main =
+    tryDiv 4 2
+    tryDiv 1 0
+    o = Option.some 2
+    o2 = Option.map { it + 1 } o # using a lambda with implicit `it` parameter
+    
+    match (2+3) with # Matching numbers
+        2 -> println "Nope"
+        5 -> println "Yes"
+        _ -> println "Something else"

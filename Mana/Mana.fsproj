@@ -6,13 +6,21 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Ext\Ext.fs" />
+        <Compile Include="Token.fs" />
+        <Compile Include="Env.fs" />
+        <Compile Include="Error.fs" />
+        <Compile Include="Value.fs" />
+        <Compile Include="Ast.fs" />
+        <Compile Include="Compiler.fs" />
+        <Compile Include="Std\Core.fs" />
         <Compile Include="Library.fs" />
-        <Content Include="examples\test.mana" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="FParsec" Version="1.1.1" />
-      <PackageReference Include="FSharpPlus" Version="1.4.1" />
+        <PackageReference Include="FParsec" Version="1.1.1" />
+        <PackageReference Include="FSharpPlus" Version="1.4.1" />
+        <PackageReference Include="FsToolkit.ErrorHandling" Version="4.9.0" />
     </ItemGroup>
 
 </Project>

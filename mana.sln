@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Mana", "Mana\Mana.fsproj", "{8F060A53-633E-4ECC-AD16-E48F40246C4D}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tests", "Tests\Tests.fsproj", "{D8EC5C46-BD08-41DC-9F5F-98DA59D1DF4A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{8F060A53-633E-4ECC-AD16-E48F40246C4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F060A53-633E-4ECC-AD16-E48F40246C4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F060A53-633E-4ECC-AD16-E48F40246C4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8EC5C46-BD08-41DC-9F5F-98DA59D1DF4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8EC5C46-BD08-41DC-9F5F-98DA59D1DF4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8EC5C46-BD08-41DC-9F5F-98DA59D1DF4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8EC5C46-BD08-41DC-9F5F-98DA59D1DF4A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
