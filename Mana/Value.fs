@@ -11,6 +11,25 @@ type Value =
 
 module Value =
 
+    let rec toString (value: Value) =
+        match value with
+        | Unit -> "()"
+        | Bool b -> $"%b{b}"
+        | Num n -> $"%f{n}"
+        | Str s -> s
+        | List items ->
+            items
+            |> List.map toString
+            |> String.concat ", "
+            |> sprintf "[%s]"
+        | Table items ->
+            items
+            |> Map.toList
+            |> List.map (fun (k, v) -> $"%s{k}: %s{toString v}")
+            |> String.concat ", "
+            |> sprintf "[%s]"
+        | Fun _ -> "fun"
+
     let isBool value =
         function
         | Bool b -> b = value

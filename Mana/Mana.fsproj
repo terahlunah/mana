@@ -13,6 +13,7 @@
         <Compile Include="Value.fs" />
         <Compile Include="Ast.fs" />
         <Compile Include="Compiler.fs" />
+        <Compile Include="Engine.fs" />
         <Compile Include="Std\Core.fs" />
         <Compile Include="Library.fs" />
     </ItemGroup>

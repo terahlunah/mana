@@ -83,7 +83,7 @@ and compileCall name args = result {
                 match (Env.get name env) with
                 | Some(Fun handler) -> Ok handler
                 | Some _ -> Error RuntimeError.NotAFunction
-                | None -> Error RuntimeError.FunctionNotFound
+                | None -> Error(RuntimeError.FunctionNotFound name)
 
             let mutable argsValues = List.empty
             let mutable env = env
@@ -91,7 +91,7 @@ and compileCall name args = result {
             for arg in args do
                 let! argEnv, argValue = arg env
                 env <- argEnv
-                argsValues <- argValue :: argsValues
+                argsValues <- argsValues @ [ argValue ]
 
             let! env, v = handler env argsValues
 
@@ -101,28 +101,26 @@ and compileCall name args = result {
 
 and compileClosure (argsNames: string list) body = result {
     let! body = compileExpr body
+    let argLength = argsNames.Length
 
-    return
-        (fun env -> result {
-            let closure =
-                Value.Fun(fun env (args: Value list) -> result {
+    let closure =
+        Value.Fun(fun env (args: Value list) -> result {
 
-                    // Check arity
-                    if argsNames.Length <> args.Length then
-                        return! Error RuntimeError.InvalidArgumentCount
+            // Check arity
+            if argLength <> args.Length then
+                return! Error RuntimeError.InvalidArgumentCount
 
-                    // Prepare env with args
-                    let scope =
-                        (argsNames, args)
-                        ||> List.zip
-                        |> List.fold (fun env (k, v) -> Env.set k v env) (Env.localScope env)
+            // Prepare env with args
+            let scope =
+                (argsNames, args)
+                ||> List.zip
+                |> List.fold (fun env (k, v) -> Env.set k v env) (Env.localScope env)
 
-                    let! env, v = body scope
-                    return env, v
-                })
-
-            return env, closure
+            let! env, v = body scope
+            return env, v
         })
+
+    return (fun env -> result { return env, closure })
 }
 
 and compileList exprs = result {
@@ -224,3 +222,39 @@ and compileExpr (expr: Expr) : CompileResult<Code> =
     | Table pairs -> compileTable pairs
     | If(condExpr, thenExpr, elseExpr) -> compileIf condExpr thenExpr elseExpr
     | Let(s, expr) -> compileLet s expr
+
+let compileDefinition (d: Definition) (m: Module) staticEnv : CompileResult<_> = result {
+
+    let! body = compileExpr d.body
+
+    let qualifiedName = $"{m.name}.{d.name}"
+    let defArgs = d.args
+    let argsLen = d.args.Length
+
+    let f =
+        Value.Fun(fun env (args: Value list) -> result {
+
+            // Check arity
+            if argsLen <> args.Length then
+                return! Error RuntimeError.InvalidArgumentCount
+
+            // Prepare env with args
+            let scope =
+                (defArgs, args)
+                ||> List.zip
+                |> List.fold (fun env (k, v) -> Env.set k v env) (Env.localScope env)
+
+            let! env, v = body scope
+            return env, v
+        })
+
+    return staticEnv |> Env.set qualifiedName f
+}
+
+let compileModule (m: Module) staticEnv : CompileResult<_> =
+    m.definitions
+    |> List.foldResult (fun staticEnv d -> compileDefinition d m staticEnv) staticEnv
+
+let compileProgram (program: Program) staticEnv : CompileResult<_> =
+    program.modules
+    |> List.foldResult (fun staticEnv m -> compileModule m staticEnv) staticEnv

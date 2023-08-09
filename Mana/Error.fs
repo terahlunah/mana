@@ -8,7 +8,7 @@ type RuntimeError =
     | InvalidArguments
     | InvalidArgumentCount
     | UnknownIdent
-    | FunctionNotFound
+    | FunctionNotFound of name: string
     | NotAFunction
     | PatternMatchingFailed
 
