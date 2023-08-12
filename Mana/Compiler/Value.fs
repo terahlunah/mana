@@ -4,6 +4,7 @@ type Value =
     | Unit
     | Bool of b: bool
     | Num of n: float
+    | Char of c: char
     | Str of s: string
     | List of items: List<Value>
     | Table of items: Map<string, Value>
@@ -16,6 +17,7 @@ module Value =
         | Unit -> "()"
         | Bool b -> $"%b{b}"
         | Num n -> $"%f{n}"
+        | Char c -> $"%c{c}"
         | Str s -> s
         | List items ->
             items

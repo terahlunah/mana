@@ -41,3 +41,12 @@ module List =
             match folder state head with
             | Ok state -> foldResult folder state tail
             | Error e -> Error e
+
+module String =
+    let at (index: int) (str: string) =
+        if index >= 0 && index < String.length str then
+            Some str[index]
+        else
+            None
+
+    let toList = Seq.toList

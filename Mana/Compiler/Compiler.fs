@@ -88,6 +88,7 @@ and compileCall name args = result {
             let mutable argsValues = List.empty
             let mutable env = env
 
+            // Use foldResult
             for arg in args do
                 let! argEnv, argValue = arg env
                 env <- argEnv
