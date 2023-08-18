@@ -1,68 +1,126 @@
-namespace Mana
+module Mana.Lexer
 
-type Lexer = {
-    source: string
-    startPos: int
-    currentPos: int
-    indents: int list
-}
+open FsToolkit.ErrorHandling
 
-module Lexer =
-    let create source = {
+let isTermLead (c: char) : bool =
+    match c with
+    | _ when
+        ('a' <= c && c <= 'z')
+        || ('A' <= c && c <= 'Z')
+        || c = '='
+        || c = '+'
+        || c = '-'
+        || c = '*'
+        || c = '/'
+        || c = '>'
+        || c = '<'
+        || c = '_'
+        || c = '|'
+        || c = '^'
+        || c = '%'
+        || c = '?'
+        || c = '!'
+        || c = ':'
+        || c = '~'
+        ->
+        true
+    | _ -> false
+
+let isTerm (c: char) : bool =
+    match c with
+    | _ when
+        ('a' <= c && c <= 'z')
+        || ('A' <= c && c <= 'Z')
+        || ('0' <= c && c <= '9')
+        || c = '='
+        || c = '+'
+        || c = '-'
+        || c = '*'
+        || c = '/'
+        || c = '>'
+        || c = '<'
+        || c = '_'
+        || c = '|'
+        || c = '^'
+        || c = '%'
+        || c = '?'
+        || c = '!'
+        || c = ':'
+        || c = '~'
+        ->
+        true
+    | _ -> false
+
+type Lexer(source) =
+    let mutable source: string = source
+    let mutable startPos: int = 0
+    let mutable currentPos: int = 0
+    let mutable indents: int list = []
+    let mutable tokens: TokenSpan list = []
+
+    member self.span() = {
         source = source
-        startPos = 0
-        currentPos = 0
-        indents = []
+        start = startPos
+        size = currentPos - startPos
     }
 
-    let span lexer = {
-        source = lexer.source
-        start = lexer.startPos
-        size = lexer.currentPos - lexer.startPos
-    }
-
-    let error kind (lexer: Lexer) = {
+    member self.error kind = {
         kind = kind
-        span = span lexer
+        span = self.span ()
     }
 
-    let indentLevel (lexer: Lexer) =
-        match lexer.indents with
+    member self.indentLevel() =
+        match indents with
         | [] -> 0
         | head :: _ -> head
 
-    let hasIndent (level: int) (lexer: Lexer) = lexer.indents |> List.contains level
+    member self.hasIndent(level: int) = indents |> List.contains level
 
-    let pushIndent (level: int) (lexer: Lexer) = { lexer with indents = level :: lexer.indents }
+    member self.pushIndent(level: int) = indents <- level :: indents
 
-    let popIndent (level: int) (lexer: Lexer) =
+    member self.popIndent(level: int) =
         let mutable count = 0
-        let mutable newIndents = lexer.indents
 
-        while indentLevel lexer <> level do
-            newIndents <- List.tail newIndents
+        while self.indentLevel () <> level do
+            indents <- List.tail indents
             count <- count + 1
 
-        { lexer with indents = newIndents }, count
+        count
 
-    let current (lexer: Lexer) : char option = String.at lexer.currentPos lexer.source
+    member self.current() : char option = String.at currentPos source
 
-    let peek (lexer: Lexer) : char option =
-        String.at (lexer.currentPos + 1) lexer.source
+    member self.peek() : char option = String.at (currentPos + 1) source
 
-    let advance (lexer: Lexer) : Lexer = { lexer with currentPos = lexer.currentPos + 1 }
+    member self.advance() = currentPos <- currentPos + 1
 
-    let isLineStart (lexer: Lexer) : bool =
-        if lexer.currentPos > 1 then
-            match String.at (lexer.currentPos - 1) lexer.source with
+    member self.emit(token) = tokens <- tokens @ [ token ]
+
+    member self.token(token) =
+        token
+        |> TokenSpan.ofToken
+        |> TokenSpan.withSpan (self.span ())
+
+    member self.token(token, b: bool) =
+        self.token token |> TokenSpan.withBool b
+
+    member self.token(token, n: double) = self.token token |> TokenSpan.withNum n
+
+    member self.token(token, c: char) =
+        self.token token |> TokenSpan.withChar c
+
+    member self.token(token, s: string) = self.token token |> TokenSpan.withStr s
+
+    member self.isLineStart() : bool =
+        if currentPos > 1 then
+            match String.at (currentPos - 1) source with
             | Some c -> c = '\n'
             | None -> false
         else
             true
 
-    let trace (lexer: Lexer) =
+    member self.trace() =
         let src =
-            lexer.source
+            source
             |> String.toList
             |> List.map (fun c ->
                 match c with
@@ -72,94 +130,160 @@ module Lexer =
             |> String.concat ""
 
         printfn "["
-        printfn $"%A{lexer.indents}"
+        printfn $"%A{indents}"
         printfn "]"
         printfn $"%s{src}"
-        printfn "%s↑" (String.replicate lexer.currentPos " ")
+        printfn "%s↑" (String.replicate currentPos " ")
 
-    let isTermLead (c: char) : bool =
-        match c with
-        | _ when
-            ('a' <= c && c <= 'z')
-            || ('A' <= c && c <= 'Z')
-            || c = '='
-            || c = '+'
-            || c = '-'
-            || c = '*'
-            || c = '/'
-            || c = '>'
-            || c = '<'
-            || c = '_'
-            || c = '|'
-            || c = '^'
-            || c = '%'
-            || c = '?'
-            || c = '!'
-            || c = ':'
-            || c = '~'
-            ->
-            true
-        | _ -> false
+    member self.toSeq() = tokens |> List.toSeq
 
-    let isTerm (c: char) : bool =
-        match c with
-        | _ when
-            ('a' <= c && c <= 'z')
-            || ('A' <= c && c <= 'Z')
-            || ('0' <= c && c <= '9')
-            || c = '='
-            || c = '+'
-            || c = '-'
-            || c = '*'
-            || c = '/'
-            || c = '>'
-            || c = '<'
-            || c = '_'
-            || c = '|'
-            || c = '^'
-            || c = '%'
-            || c = '?'
-            || c = '!'
-            || c = ':'
-            || c = '~'
-            ->
-            true
-        | _ -> false
+    member self.readToken() : ParseResult<bool> = result {
 
-    let read (lexer: Lexer) : Result<Lexer * char, ParseError> =
-        match current lexer with
-        | None -> Error(error ParseErrorKind.UnexpectedEof lexer)
+        self.trace ()
+
+        if self.isLineStart () then
+            do! self.readIndent ()
+
+            match self.current () with
+            | Some ' ' -> do! (self.readToken () |> Result.ignore)
+            | _ -> self.trace ()
+
+        let! some = result {
+            match self.current () with
+            | Some c ->
+                match c with
+                | c when c >= '0' && c <= '9' -> do! self.readNum ()
+                | c -> return! Error(self.error (ParseErrorKind.UnexpectedChar c))
+
+                do! self.skipWhitespace ()
+                return false
+            | None -> return true
+        }
+
+        return some
+    }
+
+    member self.skipComment() : Result<unit, ParseError> = result {
+        do! self.readExact ('#')
+
+        let rec loop () =
+            match self.current () with
+            | Some '\n'
+            | None -> ()
+            | Some _ ->
+                self.advance ()
+                loop ()
+
+        return loop ()
+    }
+
+    member self.skipWhitespace() = result {
+        let rec loop () =
+            match self.current () with
+            | Some ' '
+            | Some '\r' ->
+                self.advance ()
+                loop ()
+            | Some '\n' -> self.advance ()
+            | _ -> ()
+
+        loop ()
+        startPos <- currentPos
+        return ()
+    }
+
+    member self.read() : Result<char, ParseError> =
+        match self.current () with
+        | None -> Error(self.error ParseErrorKind.UnexpectedEof)
         | Some c ->
-            let updatedLexer = advance lexer
-            Ok(updatedLexer, c)
+            self.advance ()
+            Ok(c)
 
-    let tryReadFn (f: char -> bool) (lexer: Lexer) : Option<Lexer * char> =
-        match current lexer with
+    member self.tryReadFn(f: char -> bool) : Option<char> =
+        match self.current () with
         | Some c when f c ->
-            let updatedLexer = advance lexer
-            Some(updatedLexer, c)
+            self.advance ()
+            Some c
         | _ -> None
 
-    let tryReadExact (c: char) (lexer: Lexer) : Option<Lexer * unit> =
-        match current lexer with
+    member self.tryReadExact(c: char) : bool =
+        match self.current () with
         | Some cur when cur = c ->
-            let updatedLexer = advance lexer
-            Some(updatedLexer, ())
-        | _ -> None
+            self.advance ()
+            true
+        | _ -> false
 
-    let readExact (c: char) (lexer: Lexer) : Result<Lexer, ParseError> =
-        match tryReadExact c lexer with
-        | Some(updatedLexer, _) -> Ok updatedLexer
-        | None -> Error(error (ParseErrorKind.UnexpectedChar c) lexer)
+    member self.readExact(c: char) : ParseResult<unit> =
+        c
+        |> self.tryReadExact
+        |> thenOkOr () (self.error (ParseErrorKind.UnexpectedChar c))
 
-    let tryReadDigit (lexer: Lexer) : Option<Lexer * char> =
-        match current lexer with
+    member self.tryReadDigit() : Option<char> =
+        match self.current () with
         | Some c when '0' <= c && c <= '9' ->
-            let updatedLexer = advance lexer
-            Some(updatedLexer, c)
+            self.advance ()
+            Some c
         | _ -> None
 
-    let readDigit (lexer: Lexer) : Result<Lexer * char, ParseError> =
-        match tryReadDigit lexer with
-        | Some(updatedLexer, c) -> Ok(updatedLexer, c)
-        | None -> Error(error ParseErrorKind.ExpectedDigit lexer)
+    member self.readDigit() : ParseResult<char> =
+        self.tryReadDigit ()
+        |> Option.okOr (self.error ParseErrorKind.ExpectedDigit)
+
+    member self.readInt() : ParseResult<string> = result {
+        let mutable num = ""
+        let! digit = self.readDigit ()
+        num <- num + string digit
+
+        let rec loop () =
+            match self.tryReadDigit () with
+            | Some d ->
+                num <- num + string d
+                loop ()
+            | _ -> ()
+
+        loop ()
+        return num
+    }
+
+    member self.readNum() : ParseResult<unit> = result {
+        let! num = self.readInt ()
+
+        let mutable num = num
+
+        if self.tryReadExact '.' then
+            let! fract = self.readInt ()
+            num <- $"%s{num}.%s{fract}"
+
+        let! num =
+            parseFloat num
+            |> Option.okOr (self.error (ParseErrorKind.ParseNum num))
+
+        self.token Token.Num |> TokenSpan.withNum num |> self.emit
+
+        return ()
+    }
+
+    member self.readIndent() : ParseResult<unit> = result {
+        let mutable count = 0
+
+        while self.tryReadExact ' ' do
+            count <- count + 1
+
+        match self.current () with
+        | Some '\r'
+        | Some '\n' -> do! self.skipWhitespace ()
+        | _ ->
+            if count > self.indentLevel () then
+                self.pushIndent count
+                self.token Token.Indent |> self.emit
+            elif count < self.indentLevel () then
+                if self.hasIndent count then
+                    let count = self.popIndent count
+
+                    for _ in 0..count do
+                        self.token Token.Dedent |> self.emit
+                else
+                    return! Error(self.error ParseErrorKind.BadIndentation)
+
+        return ()
+    }

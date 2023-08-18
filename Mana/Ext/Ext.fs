@@ -6,6 +6,27 @@ module Core =
     let debug x = printfn $"%A{x}"
     let display x = printfn $"%s{x}"
 
+    let todo msg = failwith msg
+
+    let thenSome s b =
+        match b with
+        | true -> Some s
+        | false -> None
+
+    let thenOkOr o e b =
+        match b with
+        | true -> Ok o
+        | false -> Error e
+
+    let inline parseFloat s =
+        try
+            Some(float s)
+        with _ ->
+            None
+
+    let inline contains x s = Seq.exists ((=) x) s
+    let inline (=?) x s = Seq.exists ((=) x) s
+
 module Option =
     let okOr err o =
         match o with

@@ -7,7 +7,6 @@
 
     <ItemGroup>
         <Compile Include="Ext\Ext.fs" />
-        <Compile Include="Ext\ResultState.fs" />
         <Compile Include="Parser\Span.fs" />
         <Compile Include="Parser\Token.fs" />
         <Compile Include="Parser\Error.fs" />

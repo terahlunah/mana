@@ -1,12 +1,18 @@
 namespace Mana
 
 type Token =
+    | Indent
+    | Dedent
     | LParen
     | RParen
     | LBracket
     | RBracket
     | LBrace
     | RBrace
+    | Bool
+    | Num
+    | Char
+    | Str
 
 type TokenData =
     | Bool of b: bool
