@@ -1,5 +1,7 @@
 namespace Mana
 
+open FsToolkit.ErrorHandling
+
 [<AutoOpen>]
 module Core =
     let sdebug x = sprintf $"%A{x}"
@@ -27,18 +29,33 @@ module Core =
     let inline contains x s = Seq.exists ((=) x) s
     let inline (=?) x s = Seq.exists ((=) x) s
 
+    let inline whileSome cond f =
+        let rec loop () =
+            match cond () with
+            | Some x ->
+                f x
+                loop ()
+            | None -> ()
+
+        loop ()
+
 module Option =
     let okOr err o =
         match o with
         | Some x -> Ok x
         | None -> Error err
 
+    let inline unwrap o =
+        match o with
+        | Some t -> t
+        | None -> "unwrapped a None Option" |> failwith
+
 module Result =
 
-    let unwrap r =
+    let inline unwrap r =
         match r with
         | Ok t -> t
-        | Error e -> e |> sdebug |> failwith
+        | Error e -> e |> sprintf "unwrapped a Error Result: %A" |> failwith
 
     let any r = Result.mapError (fun x -> x :> obj) r
 

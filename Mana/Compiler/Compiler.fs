@@ -1,7 +1,8 @@
 module Mana.Compiler
 
+open System
 open Mana
-open Mana.Ast
+open Mana.Parser
 open FsToolkit.ErrorHandling
 
 type Code = Env<Value> -> RuntimeResult<Env<Value> * Value>
@@ -63,17 +64,6 @@ and compileBlock =
 
 and compileExprs exprs = List.traverseResultM compileExpr exprs
 
-and compileExprs2 =
-    function
-    | [] -> Ok []
-    | [ expr ] -> compileExpr expr |> Result.map List.singleton
-    | head :: tail -> result {
-        let! headCode = compileExpr head
-        let! tailCode = compileExprs tail
-
-        return headCode :: tailCode
-      }
-
 and compileCall name args = result {
     let! args = compileExprs args
 
@@ -100,7 +90,7 @@ and compileCall name args = result {
         })
 }
 
-and compileClosure (argsNames: string list) body = result {
+and compileClosure (argsNames: Argument list) body = result {
     let! body = compileExpr body
     let argLength = argsNames.Length
 
@@ -115,7 +105,7 @@ and compileClosure (argsNames: string list) body = result {
             let scope =
                 (argsNames, args)
                 ||> List.zip
-                |> List.fold (fun env (k, v) -> Env.set k v env) (Env.localScope env)
+                |> List.fold (fun env (Argument k, v) -> Env.set k v env) (Env.localScope env)
 
             let! env, v = body scope
             return env, v
@@ -213,6 +203,7 @@ and compileExpr (expr: Expr) : CompileResult<Code> =
     | Unit -> compileUnit
     | Bool b -> Ok(fun env -> Ok(env, b |> Value.Bool))
     | Num n -> Ok(fun env -> Ok(env, n |> Value.Num))
+    | Char c -> Ok(fun env -> Ok(env, c |> Value.Char))
     | Str s -> Ok(fun env -> Ok(env, s |> Value.Str))
     | Ident name -> compileIdent name
     | Call(name, args) -> compileCall name args
@@ -228,7 +219,12 @@ let compileDefinition (d: Definition) (m: Module) staticEnv : CompileResult<_> =
 
     let! body = compileExpr d.body
 
-    let qualifiedName = $"{m.name}.{d.name}"
+    let qualifiedName =
+        if m.name <> String.Empty then
+            $"{m.name}.{d.name}"
+        else
+            d.name
+
     let defArgs = d.args
     let argsLen = d.args.Length
 
@@ -243,7 +239,7 @@ let compileDefinition (d: Definition) (m: Module) staticEnv : CompileResult<_> =
             let scope =
                 (defArgs, args)
                 ||> List.zip
-                |> List.fold (fun env (k, v) -> Env.set k v env) (Env.localScope env)
+                |> List.fold (fun env (Argument k, v) -> Env.set k v env) (Env.localScope env)
 
             let! env, v = body scope
             return env, v

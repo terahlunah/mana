@@ -11,11 +11,12 @@
         <Compile Include="Parser\Token.fs" />
         <Compile Include="Parser\Error.fs" />
         <Compile Include="Parser\Lexer.fs" />
+        <Compile Include="Parser\Ast.fs" />
+        <Compile Include="Parser\Operator.fs" />
         <Compile Include="Parser\Parser.fs" />
         <Compile Include="Compiler\Error.fs" />
         <Compile Include="Compiler\Env.fs" />
         <Compile Include="Compiler\Value.fs" />
-        <Compile Include="Compiler\Ast.fs" />
         <Compile Include="Compiler\Compiler.fs" />
         <Compile Include="Engine.fs" />
         <Compile Include="Std\Core.fs" />

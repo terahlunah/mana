@@ -1,4 +1,4 @@
-namespace Mana
+namespace Mana.Parser
 
 type Span = {
     source: string
@@ -7,4 +7,23 @@ type Span = {
 }
 
 module Span =
-    let display span = failwith "todo"
+
+    let zero = {
+        source = ""
+        start = 0
+        size = 0
+    }
+
+    let display span =
+        let src =
+            span.source
+            |> String.toList
+            |> List.map (fun c ->
+                match c with
+                | '\n' -> "↵"
+                | c -> string c
+            )
+            |> String.concat ""
+
+        printfn $"%s{src}"
+        printfn "%s↑" (String.replicate span.start " ")

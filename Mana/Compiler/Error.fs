@@ -2,8 +2,6 @@ namespace Mana
 
 type CompileError = | Todo
 
-type CompileResult<'t> = Result<'t, CompileError>
-
 type RuntimeError =
     | InvalidArguments
     | InvalidArgumentCount
@@ -12,4 +10,5 @@ type RuntimeError =
     | NotAFunction
     | PatternMatchingFailed
 
-type RuntimeResult<'t> = Result<'t, RuntimeError>
+type CompileResult<'T> = Result<'T, CompileError>
+type RuntimeResult<'T> = Result<'T, RuntimeError>

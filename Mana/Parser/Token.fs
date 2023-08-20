@@ -1,4 +1,4 @@
-namespace Mana
+namespace Mana.Parser
 
 type Token =
     | Indent
@@ -13,6 +13,35 @@ type Token =
     | Num
     | Char
     | Str
+    | Def
+    | Eq
+    | Arrow
+    | Comma
+    | Colon
+    | Mod
+    | If
+    | Then
+    | Else
+    | Match
+    | With
+    | Term
+    | NewLine
+    | Eof
+
+module Token =
+    let isExpr =
+        function
+        | LParen
+        | LBrace
+        | LBracket
+        | Bool
+        | Num
+        | Char
+        | Str
+        | Term
+        | If
+        | Match -> true
+        | _ -> false
 
 type TokenData =
     | Bool of b: bool

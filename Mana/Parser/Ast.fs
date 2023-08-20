@@ -1,4 +1,4 @@
-module Mana.Ast
+namespace Mana.Parser
 
 open Mana
 
@@ -6,6 +6,7 @@ type Expr =
     | Unit
     | Bool of b: bool
     | Num of n: float
+    | Char of c: char
     | Str of s: string
     | Ident of string
     | Call of name: string * args: Expr list
@@ -17,7 +18,7 @@ type Expr =
     | If of Expr * Expr * Expr
     | Let of name: string * expr: Expr
 
-and Argument = string
+and Argument = Argument of string
 
 and MatchCase = {
     pattern: Pattern
@@ -43,12 +44,6 @@ and Definition = {
     body: Expr
 }
 
-and NativeFunction = {
-    name: string
-    arity: int
-    handler: Env<Value> -> List<Value> -> Env<Value> * RuntimeResult<Value>
-}
-
-type UseStatement = { name: string }
+// type UseStatement = { name: string }
 
 type Program = { modules: Module list }

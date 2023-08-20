@@ -1,55 +1,6 @@
-module Mana.Lexer
+namespace Mana.Parser
 
 open FsToolkit.ErrorHandling
-
-let isTermLead (c: char) : bool =
-    match c with
-    | _ when
-        ('a' <= c && c <= 'z')
-        || ('A' <= c && c <= 'Z')
-        || c = '='
-        || c = '+'
-        || c = '-'
-        || c = '*'
-        || c = '/'
-        || c = '>'
-        || c = '<'
-        || c = '_'
-        || c = '|'
-        || c = '^'
-        || c = '%'
-        || c = '?'
-        || c = '!'
-        || c = ':'
-        || c = '~'
-        ->
-        true
-    | _ -> false
-
-let isTerm (c: char) : bool =
-    match c with
-    | _ when
-        ('a' <= c && c <= 'z')
-        || ('A' <= c && c <= 'Z')
-        || ('0' <= c && c <= '9')
-        || c = '='
-        || c = '+'
-        || c = '-'
-        || c = '*'
-        || c = '/'
-        || c = '>'
-        || c = '<'
-        || c = '_'
-        || c = '|'
-        || c = '^'
-        || c = '%'
-        || c = '?'
-        || c = '!'
-        || c = ':'
-        || c = '~'
-        ->
-        true
-    | _ -> false
 
 type Lexer(source) =
     let mutable source: string = source
@@ -57,6 +8,27 @@ type Lexer(source) =
     let mutable currentPos: int = 0
     let mutable indents: int list = []
     let mutable tokens: TokenSpan list = []
+
+    let isTermLead (c: char) : bool =
+        ('a' <= c && c <= 'z')
+        || ('A' <= c && c <= 'Z')
+        || c = '='
+        || c = '+'
+        || c = '-'
+        || c = '*'
+        || c = '/'
+        || c = '>'
+        || c = '<'
+        || c = '_'
+        || c = '|'
+        || c = '^'
+        || c = '%'
+        || c = '?'
+        || c = '!'
+        || c = ':'
+        || c = '~'
+
+    let isTerm (c: char) : bool = ('0' <= c && c <= '9') || isTermLead c
 
     member self.span() = {
         source = source
@@ -129,13 +101,28 @@ type Lexer(source) =
             )
             |> String.concat ""
 
-        printfn "["
-        printfn $"%A{indents}"
+        printf "["
+
+        for i in indents do
+            printf $"%A{i},"
+
         printfn "]"
         printfn $"%s{src}"
         printfn "%s↑" (String.replicate currentPos " ")
 
-    member self.toSeq() = tokens |> List.toSeq
+    member self.lex() = result {
+
+        let rec loop () = result {
+            let! hasMore = self.readToken ()
+            if hasMore then return! loop () else return ()
+        }
+
+        do! loop ()
+
+        self.token Token.Eof |> self.emit
+
+        return tokens
+    }
 
     member self.readToken() : ParseResult<bool> = result {
 
@@ -153,11 +140,33 @@ type Lexer(source) =
             | Some c ->
                 match c with
                 | c when c >= '0' && c <= '9' -> do! self.readNum ()
+                | '\'' -> do! self.readChar ()
+                | '"' -> do! self.readStr ()
+                | '{' ->
+                    self.advance ()
+                    self.token Token.LBrace |> self.emit
+                | '}' ->
+                    self.advance ()
+                    self.token Token.RBrace |> self.emit
+                | '(' ->
+                    self.advance ()
+                    self.token Token.LParen |> self.emit
+                | ')' ->
+                    self.advance ()
+                    self.token Token.RParen |> self.emit
+                | '[' ->
+                    self.advance ()
+                    self.token Token.LBracket |> self.emit
+                | ']' ->
+                    self.advance ()
+                    self.token Token.RBracket |> self.emit
+                | '#' -> do! self.skipComment ()
+                | c when isTermLead c -> self.readTerm ()
                 | c -> return! Error(self.error (ParseErrorKind.UnexpectedChar c))
 
                 do! self.skipWhitespace ()
-                return false
-            | None -> return true
+                return true
+            | None -> return false
         }
 
         return some
@@ -184,7 +193,9 @@ type Lexer(source) =
             | Some '\r' ->
                 self.advance ()
                 loop ()
-            | Some '\n' -> self.advance ()
+            | Some '\n' ->
+                self.token Token.NewLine |> self.emit
+                self.advance ()
             | _ -> ()
 
         loop ()
@@ -259,9 +270,53 @@ type Lexer(source) =
             |> Option.okOr (self.error (ParseErrorKind.ParseNum num))
 
         self.token Token.Num |> TokenSpan.withNum num |> self.emit
-
-        return ()
     }
+
+    member self.readChar() : ParseResult<unit> = result {
+        do! self.readExact '\''
+        let! c = self.read ()
+        do! self.readExact '\''
+        self.token Token.Char |> TokenSpan.withChar c |> self.emit
+    }
+
+    member self.readStr() : ParseResult<unit> = result {
+        let mutable s = ""
+
+        do! self.readExact '"'
+
+        let rec loop () = result {
+            let! c = self.read ()
+
+            if c = '"' then
+                return ()
+            else
+                s <- s + string c
+                return! loop ()
+        }
+
+        do! loop ()
+
+        self.token Token.Str |> TokenSpan.withStr s |> self.emit
+    }
+
+    member self.readTerm() =
+        let mutable id = ""
+
+        whileSome (fun _ -> self.tryReadFn isTerm) (fun c -> id <- id + string c)
+
+        match id with
+        | "def" -> self.token Token.Def
+        | "=" -> self.token Token.Eq
+        | "if" -> self.token Token.If
+        | "then" -> self.token Token.Then
+        | "else" -> self.token Token.Else
+        | "match" -> self.token Token.Match
+        | "with" -> self.token Token.With
+        | "->" -> self.token Token.Arrow
+        | "," -> self.token Token.Comma
+        | ":" -> self.token Token.Colon
+        | _ -> self.token Token.Term |> TokenSpan.withStr id
+        |> self.emit
 
     member self.readIndent() : ParseResult<unit> = result {
         let mutable count = 0
@@ -284,6 +339,4 @@ type Lexer(source) =
                         self.token Token.Dedent |> self.emit
                 else
                     return! Error(self.error ParseErrorKind.BadIndentation)
-
-        return ()
     }
