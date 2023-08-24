@@ -4,21 +4,23 @@ open FsToolkit.ErrorHandling
 
 [<AutoOpen>]
 module Core =
-    let sdebug x = sprintf $"%A{x}"
-    let debug x = printfn $"%A{x}"
-    let display x = printfn $"%s{x}"
+    let inline sdebug x = sprintf $"%A{x}"
+    let inline debug x = printfn $"%A{x}"
+    let inline display x = printfn $"%s{x}"
 
-    let todo msg = failwith msg
+    let inline todo msg = failwith msg
 
-    let thenSome s b =
+    let inline thenSome s b =
         match b with
         | true -> Some s
         | false -> None
 
-    let thenOkOr o e b =
+    let inline thenOkOr o e b =
         match b with
         | true -> Ok o
         | false -> Error e
+
+    let inline takeIf f x = f x |> thenSome x
 
     let inline parseFloat s =
         try

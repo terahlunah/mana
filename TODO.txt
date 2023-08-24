@@ -1,0 +1,4 @@
+let bindings
+
+def with constexpr and no arguments
+def pi = 3.14

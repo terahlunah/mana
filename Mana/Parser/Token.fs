@@ -25,6 +25,7 @@ type Token =
     | Match
     | With
     | Term
+    | Operator
     | NewLine
     | Eof
 

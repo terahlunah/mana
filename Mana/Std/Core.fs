@@ -18,3 +18,23 @@ let add env args =
     match args with
     | [ Num a; Num b ] -> Ok(env, a + b |> Num)
     | _ -> Error RuntimeError.InvalidArguments
+
+let sub env args =
+    match args with
+    | [ Num a; Num b ] -> Ok(env, a - b |> Num)
+    | _ -> Error RuntimeError.InvalidArguments
+
+let neg env args =
+    match args with
+    | [ Num a ] -> Ok(env, -a |> Num)
+    | _ -> Error RuntimeError.InvalidArguments
+
+let mul env args =
+    match args with
+    | [ Num a; Num b ] -> Ok(env, a * b |> Num)
+    | _ -> Error RuntimeError.InvalidArguments
+
+let div env args =
+    match args with
+    | [ Num a; Num b ] -> Ok(env, a / b |> Num)
+    | _ -> Error RuntimeError.InvalidArguments

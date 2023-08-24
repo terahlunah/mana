@@ -1,5 +1,6 @@
 namespace Mana.Parser
 
+open FParsec
 open Mana
 
 type Expr =
@@ -9,7 +10,9 @@ type Expr =
     | Char of c: char
     | Str of s: string
     | Ident of string
-    | Call of name: string * args: Expr list
+    | Call of symbol: string * args: Expr list
+    | BinaryOp of op: BinaryOperator * left: Expr * right: Expr
+    | UnaryOp of op: UnaryOperator * arg: Expr
     | Closure of args: Argument list * body: Expr
     | Match of expr: Expr * cases: MatchCase list
     | Block of Expr list
@@ -18,7 +21,9 @@ type Expr =
     | If of Expr * Expr * Expr
     | Let of name: string * expr: Expr
 
-and Argument = Argument of string
+and Argument =
+    | Named of string
+    | Unit
 
 and MatchCase = {
     pattern: Pattern

@@ -1,7 +1,7 @@
 ﻿open Mana
-open Mana.Ast
+open Mana.Parser
 open FsToolkit.ErrorHandling
-open Mana.Lexer
+open System
 
 // let doubleDefinition: Definition = {
 //     name = "double"
@@ -29,28 +29,29 @@ open Mana.Lexer
 //
 // let program: Program = { modules = [ mainModule ] }
 
-printfn "↵"
-printfn "\u21B5"
-
 let source =
-    """def + a b = add a b
-def main = + 2 3
+    """def pi () = 3.14
+def tau () = 2 * pi ()
+def main () = tau ()
 """
 
 let lexer = Lexer(source)
 let tokens = lexer.lex () |> Result.unwrap
 let parser = Parser(tokens)
-let program = parser.parse () |> Result.unwrap
+
+let program =
+    parser.parse ()
+    |> Result.teeError (fun e -> printfn $"Error: %s{e.pretty ()}")
+    |> Result.unwrap
 
 debug program
 
 let value =
     Engine.init
-    |> Engine.set "add" (Value.Fun Mana.Std.Core.add)
-    |> Engine.set "print" (Value.Fun Mana.Std.Core.display)
+    |> Engine.withStd
     |> Engine.loadProgram program
     |> Result.unwrap
-    |> Engine.run "main" []
+    |> Engine.run "main" [ Value.Unit ]
     |> Result.unwrap
 
 value |> Value.toString |> display

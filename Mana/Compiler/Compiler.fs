@@ -105,7 +105,13 @@ and compileClosure (argsNames: Argument list) body = result {
             let scope =
                 (argsNames, args)
                 ||> List.zip
-                |> List.fold (fun env (Argument k, v) -> Env.set k v env) (Env.localScope env)
+                |> List.fold
+                    (fun env (k, v) ->
+                        match k with
+                        | Named s -> Env.set s v env
+                        | Unit -> env
+                    )
+                    (Env.localScope env)
 
             let! env, v = body scope
             return env, v
@@ -200,20 +206,22 @@ and matchCase env value (pattern: Pattern) : bool * Env<Value> =
 
 and compileExpr (expr: Expr) : CompileResult<Code> =
     match expr with
-    | Unit -> compileUnit
-    | Bool b -> Ok(fun env -> Ok(env, b |> Value.Bool))
-    | Num n -> Ok(fun env -> Ok(env, n |> Value.Num))
-    | Char c -> Ok(fun env -> Ok(env, c |> Value.Char))
-    | Str s -> Ok(fun env -> Ok(env, s |> Value.Str))
-    | Ident name -> compileIdent name
-    | Call(name, args) -> compileCall name args
-    | Closure(args, body) -> compileClosure args body
-    | Match(expr, cases) -> compileMatch expr cases
-    | Block exprs -> compileBlock exprs
-    | List exprs -> compileList exprs
-    | Table pairs -> compileTable pairs
-    | If(condExpr, thenExpr, elseExpr) -> compileIf condExpr thenExpr elseExpr
-    | Let(s, expr) -> compileLet s expr
+    | Expr.Unit -> compileUnit
+    | Expr.Bool b -> Ok(fun env -> Ok(env, b |> Value.Bool))
+    | Expr.Num n -> Ok(fun env -> Ok(env, n |> Value.Num))
+    | Expr.Char c -> Ok(fun env -> Ok(env, c |> Value.Char))
+    | Expr.Str s -> Ok(fun env -> Ok(env, s |> Value.Str))
+    | Expr.Ident name -> compileIdent name
+    | Expr.Call(name, args) -> compileCall name args
+    | Expr.Closure(args, body) -> compileClosure args body
+    | Expr.Match(expr, cases) -> compileMatch expr cases
+    | Expr.Block exprs -> compileBlock exprs
+    | Expr.List exprs -> compileList exprs
+    | Expr.Table pairs -> compileTable pairs
+    | Expr.If(condExpr, thenExpr, elseExpr) -> compileIf condExpr thenExpr elseExpr
+    | Expr.Let(s, expr) -> compileLet s expr
+    | Expr.BinaryOp(op, left, right) -> compileCall op.handler [ left; right ]
+    | Expr.UnaryOp(op, arg) -> compileCall op.handler [ arg ]
 
 let compileDefinition (d: Definition) (m: Module) staticEnv : CompileResult<_> = result {
 
@@ -239,7 +247,13 @@ let compileDefinition (d: Definition) (m: Module) staticEnv : CompileResult<_> =
             let scope =
                 (defArgs, args)
                 ||> List.zip
-                |> List.fold (fun env (Argument k, v) -> Env.set k v env) (Env.localScope env)
+                |> List.fold
+                    (fun env (k, v) ->
+                        match k with
+                        | Named s -> Env.set s v env
+                        | Unit -> env
+                    )
+                    (Env.localScope env)
 
             let! env, v = body scope
             return env, v

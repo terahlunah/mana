@@ -1,6 +1,7 @@
 namespace Mana
 
-open Mana.Ast
+open Mana
+open Mana.Parser
 open Mana.Compiler
 open FsToolkit.ErrorHandling
 
@@ -34,3 +35,12 @@ module Engine =
 
         return v
     }
+
+    let withStd engine =
+        engine
+        |> set "add" (Value.Fun Mana.Std.Core.add)
+        |> set "neg" (Value.Fun Mana.Std.Core.neg)
+        |> set "sub" (Value.Fun Mana.Std.Core.sub)
+        |> set "mul" (Value.Fun Mana.Std.Core.mul)
+        |> set "div" (Value.Fun Mana.Std.Core.div)
+        |> set "print" (Value.Fun Mana.Std.Core.display)

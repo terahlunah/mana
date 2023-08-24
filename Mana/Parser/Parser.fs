@@ -10,34 +10,14 @@ type Parser(tokens: TokenSpan list) =
     let mutable index = 0
     let mutable span = Span.zero
 
-    let mutable operators =
-        let d = Dictionary<string, Operator>()
-
-        d["+"] <- {
-            name = "+"
-            arity = 2
-            precedence = 30
-        }
-
-        d
-
     member self.error kind = {
         span = span
         kind = kind
     }
 
     member self.trace() =
-        let t =
-            tokens
-            |> List.map (fun ts -> $"%A{ts.token} %A{ts.data}\n")
-            |> String.concat ""
-
-        printf $"%s{t}"
-
         match (List.tryItem index tokens) with
-        | Some ts ->
-            printfn $"-> %A{ts.token}"
-            ts.span |> Span.display
+        | Some ts -> printfn $"-> %A{ts.token} [%A{ts.data}] @ %O{ts.span}"
         | None -> ()
 
     member self.current() =
@@ -75,6 +55,25 @@ type Parser(tokens: TokenSpan list) =
             return! Error(self.error (ParseErrorKind.ExpectedToken(expected = kind, got = ts.token)))
     }
 
+    member self.skipAll(kind) = result {
+        let! ts = self.current ()
+
+        if ts.token = kind then
+            self.advance ()
+            return! self.skipAll (kind)
+        else
+            return ()
+    }
+
+    member self.skipData(kind, data) = result {
+        let! ts = self.next ()
+
+        if ts.token = kind && ts.data = Some(data) then
+            return ()
+        else
+            return! Error(self.error (ParseErrorKind.ExpectedToken(expected = kind, got = ts.token)))
+    }
+
     member self.is(kind) =
         self.current ()
         |> Result.map (fun ts -> ts.token = kind)
@@ -106,22 +105,44 @@ type Parser(tokens: TokenSpan list) =
         return items
     }
 
+    member self.parseSeqUntilData(until, data, p) = result {
+        let mutable items = []
+
+        while not (self.is until) do
+            let! item = p ()
+            items <- items @ [ item ]
+
+        do! self.skipData (until, data)
+
+        return items
+    }
+
     member self.parse() : ParseResult<Program> = result {
         self.trace ()
-
-        let! ts = self.current ()
 
         let mutable definitions = []
         let mutable modules = []
 
-        match ts.token with
-        | Mod ->
-            let! m = self.parseMod ()
-            modules <- m :: modules
-        | Def ->
-            let! d = self.parseDef ()
-            definitions <- d :: definitions
-        | _ -> return! Error(self.error (ParseErrorKind.ExpectedDefinition(got = ts.token)))
+        let rec loop () = result {
+            do! self.skipAll Token.NewLine
+            let! ts = self.current ()
+
+            match ts.token with
+            | Mod ->
+                let! m = self.parseMod ()
+                modules <- m :: modules
+                return! loop ()
+            | Def ->
+                let! d = self.parseDef ()
+                printfn $"parse def %A{d}"
+                definitions <- d :: definitions
+                return! loop ()
+            | _ ->
+                printfn $"parse token %A{ts}"
+                return ()
+        }
+
+        do! loop ()
 
         let rootModule = {
             name = ""
@@ -139,7 +160,7 @@ type Parser(tokens: TokenSpan list) =
         let! nameToken = self.expect Token.Term
         let name = nameToken |> TokenSpan.asStr |> Option.unwrap
 
-        do! self.skip Token.Eq
+        do! self.skipData (Token.Operator, TokenData.Str "=")
 
         let! definitions = self.parseSeqDelimitedBy (Token.Indent, Token.Dedent, self.parseDef)
 
@@ -150,11 +171,12 @@ type Parser(tokens: TokenSpan list) =
     }
 
     member self.parseDef() : ParseResult<Definition> = result {
+        printfn "parsing def"
         do! self.skip Token.Def
 
         let! nameToken = self.expect Token.Term
         let name = nameToken |> TokenSpan.asStr |> Option.unwrap // TODO: remove unwrap
-        let! args = self.parseSeqUntil (Token.Eq, self.parseArgument)
+        let! args = self.parseSeqUntilData (Token.Operator, TokenData.Str "=", self.parseArgument)
         let! body = self.parseExpr ()
 
         return {
@@ -165,36 +187,48 @@ type Parser(tokens: TokenSpan list) =
     }
 
     member self.parseArgument() : ParseResult<Argument> = result {
-        let! nameToken = self.expect Token.Term
-        let name = nameToken |> TokenSpan.asStr |> Option.unwrap // TODO: remove unwrap
+        let! ts = self.current ()
 
-        return Argument name
+        match ts.token with
+        | Token.Term ->
+            let! nameToken = self.expect Token.Term
+
+            return
+                nameToken
+                |> TokenSpan.asStr
+                |> Option.unwrap
+                |> Argument.Named
+        | Token.LParen ->
+            do! self.skip Token.LParen
+            do! self.skip Token.RParen
+            return Argument.Unit
+        | _ -> return! Error(self.error ParseErrorKind.ExpectedArgument)
+
     }
 
     member self.parseExpr() : ParseResult<Expr> = self.parseExpr (0)
 
-    member self.parseExpr(precedence) : ParseResult<Expr> = result {
-
+    member self.parseExpr(p) : ParseResult<Expr> = result {
         let! left = self.parseElement ()
 
-        let! current = self.current ()
+        let rec loop left = result {
+            let! op = self.tryParseBinaryOperator (p)
+            //TODO return error if unknown operator
 
-        let expr =
-            match ts.token with
-            | Token.Bool
-            | Token.Num
-            | Token.Char
-            | Token.Str -> self.parseLiteral ()
-            | Token.LParen -> self.parseParen ()
-            | Token.LBracket -> self.parseBracket ()
-            | Token.LBrace -> failwith "todo"
-            | Token.Eq -> failwith "todo"
-            | Token.If -> failwith "todo"
-            | Token.Match -> failwith "todo"
-            | Token.Term -> failwith "todo"
-            | _ -> Error(self.error (ParseErrorKind.ExpectedExpr(got = ts.token)))
+            match op with
+            | Some op ->
+                let q =
+                    match op.associativity with
+                    | Left -> op.precedence + 1
+                    | Right -> op.precedence
 
-        return! expr
+                let! right = self.parseExpr q
+                let e = Expr.BinaryOp(op, left, right)
+                return! loop e
+            | None -> return left
+        }
+
+        return! loop left
     }
 
     member self.parseElement() : ParseResult<Expr> = result {
@@ -207,16 +241,88 @@ type Parser(tokens: TokenSpan list) =
             | Token.Num
             | Token.Char
             | Token.Str -> self.parseLiteral ()
-            | Token.LParen -> self.parseParen ()
-            | Token.LBracket -> self.parseBracket ()
+            | Token.LParen -> self.parseParenExpr ()
+            | Token.LBracket -> failwith "todo"
             | Token.LBrace -> failwith "todo"
             | Token.Eq -> failwith "todo"
             | Token.If -> failwith "todo"
             | Token.Match -> failwith "todo"
-            | Token.Term -> failwith "todo"
+            | Token.Term -> self.parseTerm ()
+            | Token.Operator -> result {
+                let! op = self.parseUnaryOperator ()
+                let q = op.precedence
+                let! e = self.parseExpr q
+                return UnaryOp(op, e)
+              }
             | _ -> Error(self.error (ParseErrorKind.ExpectedExpr(got = ts.token)))
 
         return! expr
+    }
+
+    member self.isExpr(t) =
+        match t with
+        | Token.Bool
+        | Token.Num
+        | Token.Char
+        | Token.Str
+        | Token.LParen
+        | Token.LBracket
+        | Token.LBrace
+        | Token.If
+        | Token.Match
+        | Token.Term
+        | Token.Operator -> true
+        | _ -> false
+
+    member self.parseTerm() : ParseResult<Expr> = result {
+        let! ts = self.expect Token.Term
+
+        let symbol = ts |> TokenSpan.asStr |> Option.unwrap
+
+        let! ts = self.current ()
+
+        if self.isExpr ts.token then
+            let! arg = self.parseExpr ()
+            return Call(symbol, [ arg ])
+        else
+            return Ident symbol
+    }
+
+    member self.tryParseBinaryOperator(p) : ParseResult<Option<BinaryOperator>> = result {
+        let! ts = self.current ()
+
+        return!
+            match ts.token with
+            | Token.Operator -> self.parseBinaryOperator (p)
+            | _ -> Ok None
+
+    }
+
+    member self.parseBinaryOperator(p) : ParseResult<Option<BinaryOperator>> = result {
+        let! ts = self.current ()
+
+        let symbol = ts |> TokenSpan.asStr |> Option.unwrap
+
+        let! op =
+            BinaryOperator.find symbol
+            |> Option.okOr (self.error (ParseErrorKind.UnknownOperator symbol))
+
+        if op.precedence >= p then
+            self.advance ()
+            return Some op
+        else
+            return None
+
+    }
+
+    member self.parseUnaryOperator() : ParseResult<UnaryOperator> = result {
+        let! ts = self.expect Token.Operator
+
+        let symbol = ts |> TokenSpan.asStr |> Option.unwrap
+
+        return!
+            UnaryOperator.find symbol
+            |> Option.okOr (self.error ParseErrorKind.ExpectedOperator)
     }
 
     member self.parseLiteral() : ParseResult<Expr> = result {
@@ -238,11 +344,15 @@ type Parser(tokens: TokenSpan list) =
     member self.parseParenExpr() : ParseResult<Expr> = result {
         do! self.skip Token.LParen
 
-        let! expr = self.parseExpr ()
+        let! ts = self.current ()
 
-        do! self.skip Token.RParen
-
-        return expr
+        if ts.token = Token.RParen then
+            do! self.skip Token.RParen
+            return Expr.Unit
+        else
+            let! expr = self.parseExpr ()
+            do! self.skip Token.RParen
+            return expr
     }
 
 // member self.parseBracket() : ParseResult<Expr> = result {

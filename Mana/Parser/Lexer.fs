@@ -1,5 +1,6 @@
 namespace Mana.Parser
 
+open Mana
 open FsToolkit.ErrorHandling
 
 type Lexer(source) =
@@ -10,16 +11,16 @@ type Lexer(source) =
     let mutable tokens: TokenSpan list = []
 
     let isTermLead (c: char) : bool =
-        ('a' <= c && c <= 'z')
-        || ('A' <= c && c <= 'Z')
-        || c = '='
+        ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c = '_'
+
+    let isOperator (c: char) : bool =
+        c = '='
         || c = '+'
         || c = '-'
         || c = '*'
         || c = '/'
         || c = '>'
         || c = '<'
-        || c = '_'
         || c = '|'
         || c = '^'
         || c = '%'
@@ -96,7 +97,8 @@ type Lexer(source) =
             |> String.toList
             |> List.map (fun c ->
                 match c with
-                | '\n' -> "↵"
+                | '\r' -> ""
+                | '\n' -> "\\n"
                 | c -> string c
             )
             |> String.concat ""
@@ -125,15 +127,12 @@ type Lexer(source) =
     }
 
     member self.readToken() : ParseResult<bool> = result {
-
-        self.trace ()
-
         if self.isLineStart () then
             do! self.readIndent ()
 
             match self.current () with
             | Some ' ' -> do! (self.readToken () |> Result.ignore)
-            | _ -> self.trace ()
+            | _ -> ()
 
         let! some = result {
             match self.current () with
@@ -161,6 +160,7 @@ type Lexer(source) =
                     self.advance ()
                     self.token Token.RBracket |> self.emit
                 | '#' -> do! self.skipComment ()
+                | c when isOperator c -> self.readOperator ()
                 | c when isTermLead c -> self.readTerm ()
                 | c -> return! Error(self.error (ParseErrorKind.UnexpectedChar c))
 
@@ -298,6 +298,15 @@ type Lexer(source) =
 
         self.token Token.Str |> TokenSpan.withStr s |> self.emit
     }
+
+    member self.readOperator() =
+        let mutable op = ""
+
+        whileSome (fun _ -> self.tryReadFn isOperator) (fun c -> op <- op + string c)
+
+        self.token Token.Operator
+        |> TokenSpan.withStr op
+        |> self.emit
 
     member self.readTerm() =
         let mutable id = ""

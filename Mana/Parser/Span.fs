@@ -1,10 +1,31 @@
 namespace Mana.Parser
 
+open Mana
+
 type Span = {
     source: string
     start: int
     size: int
-}
+} with
+
+    override self.ToString() =
+        $"%A{self.start} -> %A{self.start + self.size}"
+
+    member self.pretty() =
+        let src =
+            self.source
+            |> String.toList
+            |> List.map (fun c ->
+                match c with
+                | '\r' -> ""
+                | '\n' -> "\\n"
+                | c -> string c
+            )
+            |> String.concat ""
+
+        let arrow = String.replicate self.start " "
+
+        sprintf $"%s{src}\n%s{arrow}↑\n"
 
 module Span =
 
