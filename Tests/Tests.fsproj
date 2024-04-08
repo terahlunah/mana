@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="Parser.fs"/>
+        <Compile Include="Optimizer.fs"/>
+        <!--        <Compile Include="Eval.fs"/>-->
+        <!--        <Compile Include="Macro.fs"/>-->
+        <!--        <Compile Include="Indexing.fs"/>-->
+        <!--        <Compile Include="Format.fs"/>-->
+        <!--        <Compile Include="Interop.fs"/>-->
+        <Compile Include="Main.fs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Mana\Mana.fsproj"/>
+        <ProjectReference Include="..\..\Yute\Yute\Yute.fsproj"/>
+    </ItemGroup>
+
+</Project>

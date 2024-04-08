@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <AssemblyName>ManaLib</AssemblyName>
+        <RootNamespace>Mana</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="Span.fs"/>
+        <Compile Include="Token.fs"/>
+        <Compile Include="Error.fs"/>
+        <Compile Include="Lexer.fs"/>
+        <Compile Include="Operator.fs"/>
+        <Compile Include="Ast.fs"/>
+        <Compile Include="Parser.fs"/>
+        <Compile Include="Optimizer.fs"/>
+        <Compile Include="Env.fs"/>
+        <Compile Include="Value.fs"/>
+        <Compile Include="Compiler.fs"/>
+        <Compile Include="Core.fs"/>
+        <Compile Include="Library.fs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="C:\home\dev\yute\Yute\Yute.fsproj"/>
+    </ItemGroup>
+
+</Project>
