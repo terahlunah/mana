@@ -1,0 +1,12 @@
+
+; Seq
+
+let empty = { it.len == 0 } 
+
+let nth = {|l,n|
+    if (n > 0) { nth (l.tail) (n-1) } { l.head }
+}
+
+let take = { |l, n|
+
+}

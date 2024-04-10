@@ -6,10 +6,9 @@ open Yute
 
 let testOptimize code expected =
     let tokens = Lexer.lex code
-    let ast = Parser(tokens).parseExpr 0
-    let optimized = Optimizer.optimize ast
+    let ast = Parser.parseMany tokens
 
-    let got = sdebug optimized
+    let got = sdebug ast
     let expected = sdebug expected
 
     Test.equalMessage code got expected
@@ -30,7 +29,22 @@ let optimizerTests =
                 "map",
                 [
                     Ast.List [ Ast.Num 0 ]
-                    Ast.Closure([], [ Ast.Call("it", []) ])
+                    Ast.Closure([ "it" ], [ Ast.Call("it", []) ])
+                ]
+            )
+        }
+        test "nested chain" {
+            "[0].map { it }.len"
+            == Ast.Call(
+                "len",
+                [
+                    Ast.Call(
+                        "map",
+                        [
+                            Ast.List [ Ast.Num 0 ]
+                            Ast.Closure([ "it" ], [ Ast.Call("it", []) ])
+                        ]
+                    )
                 ]
             )
         }

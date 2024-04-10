@@ -6,7 +6,7 @@ open Yute
 
 let testParseExpr code expected =
     let tokens = Lexer.lex code
-    let ast = Parser(tokens).parseExpr 0
+    let ast = Parser.parseExprRaw tokens
 
     let got = sdebug ast
     let expected = sdebug expected
@@ -15,7 +15,7 @@ let testParseExpr code expected =
 
 let testParseMany code expected =
     let tokens = Lexer.lex code
-    let ast = Parser(tokens).parseMany ()
+    let ast = Parser.parseManyRaw tokens
 
     let got = sdebug ast
     let expected = sdebug expected
@@ -158,13 +158,31 @@ let operators =
                         "map",
                         [
                             Ast.Closure(
-                                [],
+                                [ "it" ],
                                 [
                                     Ast.Call("__add", [ Ast.Call("it", []); Ast.Num 1.0 ])
                                 ]
                             )
                         ]
                     )
+                ]
+            )
+        }
+
+        test "nested chain" {
+            "[1, 2].map {it}.len"
+            == Ast.Call(
+                "__chain",
+                [
+                    Ast.Call(
+                        "__chain",
+                        [
+                            Ast.List[Ast.Num 1
+                                     Ast.Num 2]
+                            Ast.Call("map", [ Ast.Closure([ "it" ], [ Ast.Call("it", []) ]) ])
+                        ]
+                    )
+                    Call("len", [])
                 ]
             )
         }

@@ -20,8 +20,8 @@ and compileCall name args : Callable =
     fun env ->
         match (env.get name) with
         | Some(Value.Closure handler) ->
-            let run e = e env
-            let args = args |> List.map run
+            let eval e = e env
+            let args = args |> List.map eval
 
             handler env args
         | Some e -> e
@@ -56,8 +56,8 @@ and compileList exprs : Callable =
     let exprs = compileExprs exprs
 
     fun env ->
-        let run e = e env
-        exprs |> List.map run |> Value.List
+        let eval e = e env
+        exprs |> List.map eval |> Value.List
 
 and compileTable items : Callable =
 
@@ -66,8 +66,8 @@ and compileTable items : Callable =
         |> List.map (fun (k, v) -> compileExpr k, compileExpr v)
 
     fun env ->
-        let run (k, v) = k env, v env
-        items |> List.map run |> Map |> Value.Table
+        let eval (k, v) = k env, v env
+        items |> List.map eval |> Map |> Value.Table
 
 and compileExpr (expr: Ast) : Callable =
     match expr with

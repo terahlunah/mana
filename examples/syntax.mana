@@ -1,8 +1,8 @@
 # test with delimiters
 
 meta [| 
-    author: "Terah", 
-    title: "Titre"
+   "author" = "Terah", 
+   "title" =  "Titre"
 |]
 
 size(640, 360)

@@ -1,6 +1,5 @@
 ﻿namespace Mana
 
-open System.Collections.Generic
 open Mana.Error
 open Yute
 open FsToolkit.ErrorHandling
@@ -10,9 +9,9 @@ type Parser(tokens: Token list) =
     let mutable index = 0
     let mutable span = Span.zero
 
-    do
-        for t in tokens do
-            displayEscaped t
+    // do
+    //     for t in tokens do
+    //         displayEscaped t
 
     member this.error kind = kind
 
@@ -218,7 +217,24 @@ type Parser(tokens: Token list) =
         )
         |> Ast.List
 
-    member this.parseTable() : Ast = Ast.Table [] // TODO
+    member this.parseTable() : Ast =
+
+        this.skip TokenKind.Hash
+
+        this.parseSeqSeparatedBy (
+            TokenKind.LBracket,
+            TokenKind.Comma,
+            TokenKind.RBracket,
+            (fun _ ->
+                this.skipAll TokenKind.NewLine
+                let k = this.parseExpr 0
+                this.skip TokenKind.Colon
+                let v = this.parseExpr 0
+                this.skipAll TokenKind.NewLine
+                k, v
+            )
+        )
+        |> Ast.Table
 
     member this.parseBinding() : Ast =
         this.skip TokenKind.Let
@@ -265,10 +281,11 @@ type Parser(tokens: Token list) =
     member this.parseLambda() : Ast =
 
         this.skip TokenKind.LBrace
+        this.skipAll TokenKind.NewLine
 
         let mutable body = []
 
-        let args =
+        let mutable args =
             if this.is TokenKind.Pipe then
                 this.parseSeqSeparatedBy (
                     TokenKind.Pipe,
@@ -285,13 +302,19 @@ type Parser(tokens: Token list) =
             else
                 []
 
+        this.skipAll TokenKind.NewLine
+
         while not (this.is TokenKind.RBrace) do
             this.skipAll TokenKind.NewLine
             let e = this.parseExpr 0
-            this.skipAll TokenKind.NewLine
             body <- body @ [ e ]
+            this.skipAll TokenKind.NewLine
 
         this.skip TokenKind.RBrace
+
+        // Add Implicit "it" argument when needed
+        if args.Length = 0 && Ast.useImplicitIt body then
+            args <- [ "it" ]
 
         Ast.Closure(args, body)
 
@@ -381,5 +404,9 @@ type Parser(tokens: Token list) =
         loop left
 
 module Parser =
-    let parseExpr tokens = Parser(tokens).parseExpr (0)
-    let parseMany tokens = Parser(tokens).parseMany ()
+
+    let parseExprRaw tokens = Parser(tokens).parseExpr 0
+    let parseManyRaw tokens = Parser(tokens).parseMany ()
+
+    let parseExpr = parseExprRaw >> Ast.optimizeAndDesugar
+    let parseMany = parseManyRaw >> List.map Ast.optimizeAndDesugar

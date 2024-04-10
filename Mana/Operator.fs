@@ -109,12 +109,6 @@ module BinaryOperator =
             associativity = Left
         }
         {
-            symbol = "!"
-            handler = "__not"
-            precedence = 60
-            associativity = Left
-        }
-        {
             symbol = "&&"
             handler = "__and"
             precedence = 30

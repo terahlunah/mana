@@ -101,7 +101,11 @@ module Value =
         | Num n -> $"%g{n}"
         | Str s -> $"\"%s{s}\""
         | Closure _ -> $"<closure>"
-        | List items -> items |> Seq.map repr |> String.concat " " |> sprintf "[%s]"
+        | List items ->
+            items
+            |> Seq.map repr
+            |> String.concat ", "
+            |> sprintf "[%s]"
         | Table(items) ->
             items
             |> Seq.map (fun kv -> $"%s{repr kv.Key}: %s{repr kv.Value}")

@@ -56,7 +56,6 @@ let repl () =
     let prompt = Prompt(configuration = config)
 
     let m = Mana()
-    m.loadCore ()
 
     let rec loop () =
         let input =
@@ -77,7 +76,6 @@ let repl () =
 let run path argv =
     try
         let m = Mana()
-        m.loadCore ()
         m.set ("argv", argv |> List.map Value.Str |> Value.List)
 
         let code = File.ReadAllText path
