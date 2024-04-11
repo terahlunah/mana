@@ -38,7 +38,7 @@ type Mana() as this =
 
         let script = tokens |> Parser.parseMany
 
-        let runScript = Compiler.compileScript script
+        let runScript = Compiler.compileExpr script
 
         runScript globalEnv
 

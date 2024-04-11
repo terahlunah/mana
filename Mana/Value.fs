@@ -72,16 +72,36 @@ type Value =
 
 module Value =
 
-    let isTrue (v: Value) =
-        match v with
+    let isTrue =
+        function
         | Bool false
         | Nil -> false
         | _ -> true
 
-    let isFalse (v: Value) =
-        match v with
+    let isFalse =
+        function
         | Bool false
         | Nil -> true
+        | _ -> false
+
+    let isNil =
+        function
+        | Nil -> true
+        | _ -> false
+
+    let isBool value =
+        function
+        | Bool b -> b = value
+        | _ -> false
+
+    let isNum value =
+        function
+        | Num n -> n = value
+        | _ -> false
+
+    let isStr value =
+        function
+        | Str s -> s = value
         | _ -> false
 
     let asList (v: Value) =

@@ -33,31 +33,31 @@ type Lexer(source: string) =
         || c = '~'
         || c = '.'
 
-    member self.span() = {
+    member this.span() = {
         source = source
         start = startPos
         size = currentPos - startPos
     }
 
-    member self.makeError kind = kind
-    member self.current() : char option = String.at currentPos source
+    member this.makeError kind = kind
+    member this.current() : char option = String.at currentPos source
 
-    member self.peek() : char option = String.at (currentPos + 1) source
+    member this.peek() : char option = String.at (currentPos + 1) source
 
-    member self.advance() = currentPos <- currentPos + 1
+    member this.advance() = currentPos <- currentPos + 1
 
-    member self.emit(token) = tokens <- tokens @ [ token ]
+    member this.emit(token) = tokens <- tokens @ [ token ]
 
-    member self.token(token) =
-        token |> Token.make |> Token.withSpan (self.span ())
+    member this.token(token) =
+        token |> Token.make |> Token.withSpan (this.span ())
 
-    member self.token(token, b: bool) = self.token token |> Token.withBool b
+    member this.token(token, b: bool) = this.token token |> Token.withBool b
 
-    member self.token(token, n: double) = self.token token |> Token.withNum n
+    member this.token(token, n: double) = this.token token |> Token.withNum n
 
-    member self.token(token, s: string) = self.token token |> Token.withStr s
+    member this.token(token, s: string) = this.token token |> Token.withStr s
 
-    member self.trace() =
+    member this.trace() =
         let src =
             source
             |> String.toList
@@ -72,145 +72,145 @@ type Lexer(source: string) =
         printfn $"%s{src}"
         printfn "%s↑" (String.replicate currentPos " ")
 
-    member self.lex() =
+    member this.lex() =
 
         let rec loop () =
-            let hasMore = self.readToken ()
+            let hasMore = this.readToken ()
             if hasMore then loop () else ()
 
         loop ()
 
-        self.advance ()
-        self.token TokenKind.Eof |> self.emit
+        this.advance ()
+        this.token TokenKind.Eof |> this.emit
 
         tokens
 
-    member self.readToken() : bool =
-        self.skipWhitespace ()
+    member this.readToken() : bool =
+        this.skipWhitespace ()
 
-        match self.current () with
+        match this.current () with
         | Some c ->
             match c with
-            | c when c >= '0' && c <= '9' -> self.readNum ()
-            | '"' -> self.readStr ()
+            | c when c >= '0' && c <= '9' -> this.readNum ()
+            | '"' -> this.readStr ()
             | '{' ->
-                self.advance ()
-                self.token TokenKind.LBrace |> self.emit
+                this.advance ()
+                this.token TokenKind.LBrace |> this.emit
             | '}' ->
-                self.advance ()
-                self.token TokenKind.RBrace |> self.emit
+                this.advance ()
+                this.token TokenKind.RBrace |> this.emit
             | '(' ->
-                self.advance ()
-                self.token TokenKind.LParen |> self.emit
+                this.advance ()
+                this.token TokenKind.LParen |> this.emit
             | ')' ->
-                self.advance ()
-                self.token TokenKind.RParen |> self.emit
+                this.advance ()
+                this.token TokenKind.RParen |> this.emit
             | '[' ->
-                self.advance ()
-                self.token TokenKind.LBracket |> self.emit
+                this.advance ()
+                this.token TokenKind.LBracket |> this.emit
             | ']' ->
-                self.advance ()
-                self.token TokenKind.RBracket |> self.emit
+                this.advance ()
+                this.token TokenKind.RBracket |> this.emit
             | '|' ->
-                self.advance ()
-                self.token TokenKind.Pipe |> self.emit
+                this.advance ()
+                this.token TokenKind.Pipe |> this.emit
             | '#' ->
-                self.advance ()
-                self.token TokenKind.Hash |> self.emit
+                this.advance ()
+                this.token TokenKind.Hash |> this.emit
             | ',' ->
-                self.advance ()
-                self.token TokenKind.Comma |> self.emit
-            | ';' -> self.readComment ()
-            | c when isSymbolHead c -> self.readSymbol ()
-            | c when isOperator c -> self.readOperator ()
-            | c -> raiseError (self.makeError (ManaError.UnexpectedChar c))
+                this.advance ()
+                this.token TokenKind.Comma |> this.emit
+            | ';' -> this.readComment ()
+            | c when isSymbolHead c -> this.readSymbol ()
+            | c when isOperator c -> this.readOperator ()
+            | c -> raiseError (this.makeError (ManaError.UnexpectedChar c))
 
             true
         | None -> false
 
-    member self.readComment() =
-        self.advance ()
+    member this.readComment() =
+        this.advance ()
 
         let mutable comment = ""
 
         let rec loop () =
-            match self.current () with
+            match this.current () with
             | Some '\n'
             | None -> ()
             | Some c ->
                 if c <> '\r' then
                     comment <- comment + string c
 
-                self.advance ()
+                this.advance ()
                 loop ()
 
         loop ()
 
-    // self.token TokenKind.Comment
+    // this.token TokenKind.Comment
     // |> Token.withStr (comment.Trim())
-    // |> self.emit
+    // |> this.emit
 
-    member self.skipWhitespace() =
+    member this.skipWhitespace() =
         startPos <- currentPos
 
         let rec loop () =
-            match self.current () with
+            match this.current () with
             | Some(' ' | '\r' | '\t') ->
-                self.advance ()
+                this.advance ()
                 loop ()
             | Some('\n') ->
-                self.advance ()
-                self.token TokenKind.NewLine |> self.emit
+                this.advance ()
+                this.token TokenKind.NewLine |> this.emit
                 loop ()
             | _ -> ()
 
         loop ()
         startPos <- currentPos
 
-    member self.read() : char =
-        match self.current () with
-        | None -> raiseError (self.makeError ManaError.UnexpectedEof)
+    member this.read() : char =
+        match this.current () with
+        | None -> raiseError (this.makeError ManaError.UnexpectedEof)
         | Some c ->
-            self.advance ()
+            this.advance ()
             c
 
-    member self.tryReadFn(f: char -> bool) : Option<char> =
-        match self.current () with
+    member this.tryReadFn(f: char -> bool) : Option<char> =
+        match this.current () with
         | Some c when f c ->
-            self.advance ()
+            this.advance ()
             Some c
         | _ -> None
 
-    member self.tryReadExact(c: char) : bool =
-        match self.current () with
+    member this.tryReadExact(c: char) : bool =
+        match this.current () with
         | Some cur when cur = c ->
-            self.advance ()
+            this.advance ()
             true
         | _ -> false
 
-    member self.readExact(c: char) =
-        if not (self.tryReadExact c) then
-            raiseError (self.makeError (ManaError.ExpectedChar c))
+    member this.readExact(c: char) =
+        if not (this.tryReadExact c) then
+            raiseError (this.makeError (ManaError.ExpectedChar c))
 
-    member self.tryReadDigit() : Option<char> =
-        match self.current () with
+    member this.tryReadDigit() : Option<char> =
+        match this.current () with
         | Some c when '0' <= c && c <= '9' ->
-            self.advance ()
+            this.advance ()
             Some c
         | _ -> None
 
-    member self.readDigit() : char =
-        match self.tryReadDigit () with
+    member this.readDigit() : char =
+        match this.tryReadDigit () with
         | Some d -> d
-        | None -> raiseError (self.makeError ManaError.ExpectedDigit)
+        | None -> raiseError (this.makeError ManaError.ExpectedDigit)
 
-    member self.readInt() : string =
+    member this.readInt() : string =
         let mutable num = ""
-        let digit = self.readDigit ()
+        let digit = this.readDigit ()
         num <- num + string digit
 
         let rec loop () =
-            match self.tryReadDigit () with
+            match this.tryReadDigit () with
             | Some d ->
                 num <- num + string d
                 loop ()
@@ -219,28 +219,28 @@ type Lexer(source: string) =
         loop ()
         num
 
-    member self.readNum() =
-        let num = self.readInt ()
+    member this.readNum() =
+        let num = this.readInt ()
 
         let mutable num = num
 
-        if self.tryReadExact '.' then
-            let fract = self.readInt ()
+        if this.tryReadExact '.' then
+            let fract = this.readInt ()
             num <- $"%s{num}.%s{fract}"
 
         let num =
             Float.parse num
-            |> Option.orRaise (ManaException(self.makeError (ManaError.ParseNum num)))
+            |> Option.orRaise (ManaException(this.makeError (ManaError.ParseNum num)))
 
-        self.token TokenKind.Num |> Token.withNum num |> self.emit
+        this.token TokenKind.Num |> Token.withNum num |> this.emit
 
-    member self.readStr() =
+    member this.readStr() =
         let mutable s = ""
 
-        do self.readExact '"'
+        do this.readExact '"'
 
         let rec loop () =
-            let c = self.read ()
+            let c = this.read ()
 
             if c = '"' then
                 ()
@@ -250,32 +250,35 @@ type Lexer(source: string) =
 
         loop ()
 
-        self.token TokenKind.Str |> Token.withStr s |> self.emit
+        this.token TokenKind.Str |> Token.withStr s |> this.emit
 
-    member self.readOperator() =
+    member this.readOperator() =
         let mutable op = ""
 
-        whileSome (fun _ -> self.tryReadFn isOperator) (fun c -> op <- op + string c)
+        whileSome (fun _ -> this.tryReadFn isOperator) (fun c -> op <- op + string c)
 
         match op with
-        | "=" -> self.token TokenKind.Eq
-        | "|" -> self.token TokenKind.Pipe
-        | ":" -> self.token TokenKind.Colon
-        | _ -> self.token TokenKind.Operator |> Token.withStr op
-        |> self.emit
+        | "=" -> this.token TokenKind.Eq
+        | "|" -> this.token TokenKind.Pipe
+        | ":" -> this.token TokenKind.Colon
+        | "->" -> this.token TokenKind.Arrow
+        | _ -> this.token TokenKind.Operator |> Token.withStr op
+        |> this.emit
 
-    member self.readSymbol() =
+    member this.readSymbol() =
         let mutable id = ""
 
-        whileSome (fun _ -> self.tryReadFn isSymbol) (fun c -> id <- id + string c)
+        whileSome (fun _ -> this.tryReadFn isSymbol) (fun c -> id <- id + string c)
 
         match id with
-        | "nil" -> self.token TokenKind.Nil
-        | "true" -> self.token TokenKind.Bool |> Token.withBool true
-        | "false" -> self.token TokenKind.Bool |> Token.withBool false
-        | "let" -> self.token TokenKind.Let
-        | _ -> self.token TokenKind.Symbol |> Token.withStr id
-        |> self.emit
+        | "nil" -> this.token TokenKind.Nil
+        | "true" -> this.token TokenKind.Bool |> Token.withBool true
+        | "false" -> this.token TokenKind.Bool |> Token.withBool false
+        | "let" -> this.token TokenKind.Let
+        | "match" -> this.token TokenKind.Match
+        | "_" -> this.token TokenKind.Underscore
+        | _ -> this.token TokenKind.Symbol |> Token.withStr id
+        |> this.emit
 
 module Lexer =
     let lex code = Lexer(code).lex ()

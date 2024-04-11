@@ -16,10 +16,12 @@ type TokenKind =
     | Comma
     | Colon
     | Let
+    | Match
     | Eq
     | Pipe
     | Operator
-    // | Comment
+    | Underscore
+    | Arrow
     | NewLine
     | Eof
 

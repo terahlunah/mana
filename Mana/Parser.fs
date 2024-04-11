@@ -100,6 +100,7 @@ type Parser(tokens: Token list) =
         | NewLine
         | Comma
         | Operator
+        | Pipe
         | Eof -> true
         | _ -> false
 
@@ -123,7 +124,21 @@ type Parser(tokens: Token list) =
 
         items
 
-    member this.parseSeqSeparatedBy(left, sep, right, p) =
+    member this.parseSeqSeparatedBy(sep, p) =
+        let mutable items = []
+
+        let rec loop () =
+            let e = p ()
+            items <- items @ [ e ]
+
+            if this.trySkip sep then
+                loop ()
+
+        loop ()
+
+        items
+
+    member this.parseSeqSeparatedAndDelimitedBy(left, sep, right, p) =
         this.skip left
 
         let mutable items = []
@@ -185,7 +200,7 @@ type Parser(tokens: Token list) =
 
         items
 
-    member this.parseMany() : Ast list =
+    member this.parseMany() : Ast =
         let mutable items = []
 
         this.skipAll TokenKind.NewLine
@@ -195,33 +210,72 @@ type Parser(tokens: Token list) =
             items <- items @ [ e ]
             this.skipAll TokenKind.NewLine
 
-        items
+        items |> Ast.Block
 
     member this.parseGroup() : Ast =
         this.skip TokenKind.LParen
-        let expr = this.parseExpr 0
-        this.skip TokenKind.RParen
-        expr
 
-    member this.parseList() : Ast =
-        this.parseSeqSeparatedBy (
+        this.skipAll TokenKind.NewLine
+
+        this.parseSeqUntil (
+            TokenKind.RParen,
+            (fun _ ->
+                this.skipAll TokenKind.NewLine
+                let e = this.parseExpr ()
+                this.skipAll TokenKind.NewLine
+                e
+            )
+        )
+        |> Ast.Block
+
+    member this.parseList(p: unit -> 'T) : 'T list =
+        this.parseSeqSeparatedAndDelimitedBy (
             TokenKind.LBracket,
             TokenKind.Comma,
             TokenKind.RBracket,
             (fun _ ->
                 this.skipAll TokenKind.NewLine
-                let e = this.parseExpr 0
+                let e = p ()
                 this.skipAll TokenKind.NewLine
                 e
             )
         )
-        |> Ast.List
+
+    member this.parseListExpr() : Ast =
+        this.parseList this.parseExpr |> Ast.List
+
+    member this.parseListPattern() : Pattern =
+        this.parseList this.parsePattern |> Pattern.List
+
+    member this.parseTable(p: unit -> 'T) : ('T * 'T) list =
+
+        this.skip TokenKind.Hash
+
+        this.parseSeqSeparatedAndDelimitedBy (
+            TokenKind.LBracket,
+            TokenKind.Comma,
+            TokenKind.RBracket,
+            (fun _ ->
+                this.skipAll TokenKind.NewLine
+                let k = p ()
+                this.skip TokenKind.Colon
+                let v = p ()
+                this.skipAll TokenKind.NewLine
+                k, v
+            )
+        )
+
+    member this.parseTableExpr() : Ast =
+        this.parseTable this.parseExpr |> Ast.Table
+
+    member this.parseTablePattern() : Pattern =
+        this.parseTable this.parsePattern |> Pattern.Table
 
     member this.parseTable() : Ast =
 
         this.skip TokenKind.Hash
 
-        this.parseSeqSeparatedBy (
+        this.parseSeqSeparatedAndDelimitedBy (
             TokenKind.LBracket,
             TokenKind.Comma,
             TokenKind.RBracket,
@@ -236,16 +290,44 @@ type Parser(tokens: Token list) =
         )
         |> Ast.Table
 
-    member this.parseBinding() : Ast =
+    member this.parseLet() : Ast =
         this.skip TokenKind.Let
 
-        let name = this.expect TokenKind.Symbol |> Token.asStr |> Option.unwrap
+        let pattern = this.parsePattern ()
 
         this.skip TokenKind.Eq
 
-        let value = this.parseExpr 0
+        let body = this.parseExpr ()
 
-        Ast.Let(name, value)
+        Ast.Let(pattern, body)
+
+    member this.parseMatch() : Ast =
+        this.skip TokenKind.Match
+
+        let v = this.parseExpr ()
+
+        this.skipAll TokenKind.NewLine
+
+        this.skip TokenKind.Pipe
+
+        let cases =
+            this.parseSeqSeparatedBy (
+                TokenKind.Pipe,
+                (fun _ ->
+                    this.skipAll TokenKind.NewLine
+                    let pattern = this.parsePattern ()
+                    this.skip TokenKind.Arrow
+                    let body = this.parseExpr ()
+                    this.skipAll TokenKind.NewLine
+
+                    {
+                        pattern = pattern
+                        body = body
+                    }
+                )
+            )
+
+        Ast.Match(v, cases)
 
     member this.parseCall() : Ast =
 
@@ -257,7 +339,7 @@ type Parser(tokens: Token list) =
 
         if this.is TokenKind.LParen then
             args <-
-                this.parseSeqSeparatedBy (
+                this.parseSeqSeparatedAndDelimitedBy (
                     TokenKind.LParen,
                     TokenKind.Comma,
                     TokenKind.RParen,
@@ -283,11 +365,9 @@ type Parser(tokens: Token list) =
         this.skip TokenKind.LBrace
         this.skipAll TokenKind.NewLine
 
-        let mutable body = []
-
         let mutable args =
             if this.is TokenKind.Pipe then
-                this.parseSeqSeparatedBy (
+                this.parseSeqSeparatedAndDelimitedBy (
                     TokenKind.Pipe,
                     TokenKind.Comma,
                     TokenKind.Pipe,
@@ -304,29 +384,33 @@ type Parser(tokens: Token list) =
 
         this.skipAll TokenKind.NewLine
 
-        while not (this.is TokenKind.RBrace) do
-            this.skipAll TokenKind.NewLine
-            let e = this.parseExpr 0
-            body <- body @ [ e ]
-            this.skipAll TokenKind.NewLine
-
-        this.skip TokenKind.RBrace
+        let body =
+            this.parseSeqUntil (
+                TokenKind.RBrace,
+                (fun _ ->
+                    this.skipAll TokenKind.NewLine
+                    let e = this.parseExpr ()
+                    this.skipAll TokenKind.NewLine
+                    e
+                )
+            )
 
         // Add Implicit "it" argument when needed
         if args.Length = 0 && Ast.useImplicitIt body then
             args <- [ "it" ]
 
-        Ast.Closure(args, body)
+        Ast.Closure(args, body |> Ast.Block)
 
     member this.parseElement() : Ast =
         let ts = this.current ()
 
         match ts.kind with
         | TokenKind.LParen -> this.parseGroup ()
-        | TokenKind.LBracket -> this.parseList ()
-        | TokenKind.Hash -> this.parseTable ()
+        | TokenKind.LBracket -> this.parseListExpr ()
+        | TokenKind.Hash -> this.parseTableExpr ()
         | TokenKind.LBrace -> this.parseLambda ()
-        | TokenKind.Let -> this.parseBinding ()
+        | TokenKind.Let -> this.parseLet ()
+        | TokenKind.Match -> this.parseMatch ()
         | TokenKind.Nil ->
             this.advance ()
             Ast.Nil
@@ -383,6 +467,34 @@ type Parser(tokens: Token list) =
             let symbol = ts |> Token.asStr |> Option.unwrap
             UnaryOperator.find symbol |> Option.isSome
 
+    member this.parsePattern() : Pattern =
+        let ts = this.current ()
+
+        match ts.kind with
+        | TokenKind.Nil ->
+            this.skip TokenKind.Nil
+            Pattern.Nil
+        | TokenKind.Underscore ->
+            this.skip TokenKind.Underscore
+            Pattern.Underscore
+        | TokenKind.Bool ->
+            let p = this.expect TokenKind.Bool
+            p |> Token.asBool |> Option.unwrap |> Pattern.Bool
+        | TokenKind.Num ->
+            let p = this.expect TokenKind.Num
+            p |> Token.asNum |> Option.unwrap |> Pattern.Num
+        | TokenKind.Str ->
+            let p = this.expect TokenKind.Str
+            p |> Token.asStr |> Option.unwrap |> Pattern.Str
+        | TokenKind.Symbol ->
+            let p = this.expect TokenKind.Symbol
+            p |> Token.asStr |> Option.unwrap |> Pattern.Symbol
+        | TokenKind.LBracket -> this.parseListPattern ()
+        | TokenKind.Hash -> this.parseTablePattern ()
+        | _ -> raiseError (this.error (ManaError.ExpectedExpr(got = ts.kind)))
+
+    member this.parseExpr() : Ast = this.parseExpr 0
+
     member this.parseExpr(p: int) : Ast =
         let left = this.parseElement ()
 
@@ -405,8 +517,8 @@ type Parser(tokens: Token list) =
 
 module Parser =
 
-    let parseExprRaw tokens = Parser(tokens).parseExpr 0
+    let parseExprRaw tokens = Parser(tokens).parseExpr ()
     let parseManyRaw tokens = Parser(tokens).parseMany ()
 
     let parseExpr = parseExprRaw >> Ast.optimizeAndDesugar
-    let parseMany = parseManyRaw >> List.map Ast.optimizeAndDesugar
+    let parseMany = parseManyRaw >> Ast.optimizeAndDesugar

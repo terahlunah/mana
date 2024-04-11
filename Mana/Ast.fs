@@ -9,11 +9,11 @@ type Ast =
     | Str of s: string
     | List of items: Ast list
     | Table of items: (Ast * Ast) list
+    | Block of body: Ast list
     | Call of name: string * args: Ast list
-    | Closure of args: string list * body: Ast list
-    | Let of name: string * value: Ast
-    // | Let of pattern: Pattern * value: Ast
-    // | Match of expr: Expr * cases: MatchCase list
+    | Closure of args: string list * body: Ast
+    | Let of pattern: Pattern * value: Ast
+    | Match of expr: Ast * cases: MatchCase list
 
 and MatchCase = {
     pattern: Pattern
@@ -27,7 +27,7 @@ and Pattern =
     | Str of s: string
     | Symbol of s: string
     | List of Pattern list
-    | Table of Pattern list
+    | Table of (Pattern * Pattern) list
     | Underscore
 
 module Ast =
@@ -42,12 +42,11 @@ module Ast =
                     let ks = items |> List.map fst |> useImplicitIt
                     let vs = items |> List.map snd |> useImplicitIt
                     ks || vs
-                | Ast.Let("it", _) -> false
                 | Ast.Let(_, value) -> useImplicitIt [ value ]
                 | Ast.Call("it", _) -> true
                 | Ast.Call(_, args) -> useImplicitIt args
                 | Ast.Closure(args, body) ->
-                    useImplicitIt body
+                    useImplicitIt [ body ]
                     && args <> List.empty
                     && not ("it" =? args)
                 | _ -> false
@@ -80,5 +79,9 @@ module Ast =
             |> List.map (fun (k, v) -> optimizeAndDesugar k, optimizeAndDesugar v)
             |> Ast.Table
         | Ast.Let(name, value) -> Ast.Let(name, optimizeAndDesugar value)
-        | Ast.Closure(args, body) -> Ast.Closure(args, List.map optimizeAndDesugar body)
+        | Ast.Closure(args, body) -> Ast.Closure(args, optimizeAndDesugar body)
+        | Ast.Block body ->
+            match body with
+            | [ x ] -> optimizeAndDesugar x
+            | _ -> Ast.Block(List.map optimizeAndDesugar body)
         | _ -> ast

@@ -29,7 +29,7 @@ let optimizerTests =
                 "map",
                 [
                     Ast.List [ Ast.Num 0 ]
-                    Ast.Closure([ "it" ], [ Ast.Call("it", []) ])
+                    Ast.Closure([ "it" ], Ast.Call("it", []))
                 ]
             )
         }
@@ -42,10 +42,12 @@ let optimizerTests =
                         "map",
                         [
                             Ast.List [ Ast.Num 0 ]
-                            Ast.Closure([ "it" ], [ Ast.Call("it", []) ])
+                            Ast.Closure([ "it" ], Ast.Call("it", []))
                         ]
                     )
                 ]
             )
         }
+
+        test "single expr block" { "(0)" == Ast.Num 0 }
     ]

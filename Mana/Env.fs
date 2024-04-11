@@ -35,6 +35,10 @@ type Env<'T> = {
 
         result
 
+    member this.merge other =
+        for KeyValue(k, v) in other.bindings do
+            this.bindings.[k] <- v
+
 module Env =
     let merge e1 e2 =
         let newBindings = Dictionary<string, 'T>(e1.bindings)

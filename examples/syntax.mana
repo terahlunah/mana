@@ -51,6 +51,19 @@ range gridSize (width - gridSize) gridSize { |x|
     }
 }
 
+let checkedDiv = {|dividend, divisor|  
+    if (divisor == 0) nil { dividend / divisor }
+}
+
+let tryDiv = {|dividend, divisor|  
+    match (checkedDiv dividend divisor)
+    | nil -> display $"{divident} / {divisor} failed"
+    | quotient -> (
+        display $"{divident} / {divisor} = {quotient}"
+    )
+}
+
+
 # test with indentation
 
 [1, 2, 3, 4]

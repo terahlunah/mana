@@ -34,6 +34,10 @@ let primitives =
         test "list 0" { "[]" == Ast.List [] }
         test "list 1" { "[1]" == Ast.List [ Ast.Num 1 ] }
         test "list 2" { "[1, 2]" == Ast.List [ Ast.Num 1; Ast.Num 2 ] }
+        test "table" {
+            "#[\"foo\": \"bar\"]"
+            == Ast.Table [ (Ast.Str "foo", Ast.Str "bar") ]
+        }
     ]
 
 let multiline =
@@ -41,18 +45,21 @@ let multiline =
     let (==) code expected = testParseMany code expected
 
     testGroup "multi lines" [
-        test "all newlines" { "1\n2\n" == [ Ast.Num 1; Ast.Num 2 ] }
-        test "all but last newlines" { "1\n2" == [ Ast.Num 1; Ast.Num 2 ] }
-        test "multiple" { "\n\n1\n\n\n2\n" == [ Ast.Num 1; Ast.Num 2 ] }
-    ]
-
-let bindings =
-
-    let (==) code expected = testParseExpr code expected
-
-    testGroup "bindings" [
-        test "number" { "let x = 2" == Ast.Let("x", Ast.Num 2) }
-        test "list" { "let x = [2]" == Ast.Let("x", Ast.List [ Ast.Num 2 ]) }
+        test "all newlines" {
+            "1\n2\n"
+            == Ast.Block[Ast.Num 1
+                         Ast.Num 2]
+        }
+        test "all but last newlines" {
+            "1\n2"
+            == Ast.Block[Ast.Num 1
+                         Ast.Num 2]
+        }
+        test "multiple" {
+            "\n\n1\n\n\n2\n"
+            == Ast.Block[Ast.Num 1
+                         Ast.Num 2]
+        }
     ]
 
 let lambdas =
@@ -60,39 +67,33 @@ let lambdas =
     let (==) code expected = testParseExpr code expected
 
     testGroup "lambdas" [
-        test "lambda empty" { "let f = {}" == Ast.Let("f", Ast.Closure([], [])) }
-        test "lambda with no arg" {
-            "let f = { 4 }"
-            == Ast.Let("f", Ast.Closure([], [ Ast.Num 4 ]))
-        }
+        test "lambda empty" { "{}" == Ast.Closure([], Ast.Block []) }
+        test "lambda with no arg" { "{ 4 }" == Ast.Closure([], Ast.Block [ Ast.Num 4 ]) }
         test "lambda with implicit arg" {
-            "let f = { it }"
-            == Ast.Let("f", Ast.Closure([], [ Ast.Call("it", []) ]))
+            "{ it }"
+            == Ast.Closure([ "it" ], Ast.Block[Ast.Call("it", [])])
         }
         test "lambda with 1 arg" {
-            "let f = { |x| x }"
-            == Ast.Let("f", Ast.Closure([ "x" ], [ Ast.Call("x", []) ]))
+            "{ |x| x }"
+            == Ast.Closure([ "x" ], Ast.Block[Ast.Call("x", [])])
         }
-        test "lambda with 1 arg no body" { "let f = { |x| }" == Ast.Let("f", Ast.Closure([ "x" ], [])) }
+        test "lambda with 1 arg no body" { "{ |x| }" == Ast.Closure([ "x" ], Ast.Block []) }
         test "lambda with 2 args" {
-            "let f = { |x, y| x}"
-            == Ast.Let("f", Ast.Closure([ "x"; "y" ], [ Ast.Call("x", []) ]))
+            "{ |x, y| x}"
+            == Ast.Closure([ "x"; "y" ], Ast.Block[Ast.Call("x", [])])
         }
         test "lambda returning lambda" {
-            "let addN = { |n| {|x| add(x, n) } }"
-            == Ast.Let(
-                "addN",
-                Ast.Closure(
-                    [ "n" ],
-                    [
-                        Ast.Closure(
-                            [ "x" ],
-                            [
-                                Ast.Call("add", [ Ast.Call("x", []); Ast.Call("n", []) ])
-                            ]
-                        )
-                    ]
-                )
+            "{ |n| {|x| add(x, n) } }"
+            == Ast.Closure(
+                [ "n" ],
+                Ast.Block [
+                    Ast.Closure(
+                        [ "x" ],
+                        Ast.Block [
+                            Ast.Call("add", [ Ast.Call("x", []); Ast.Call("n", []) ])
+                        ]
+                    )
+                ]
             )
         }
     ]
@@ -111,7 +112,7 @@ let calls =
         test "f(1) 2" { "f(1) 2" == Ast.Call("f", [ Ast.Num 1; Ast.Num 2 ]) }
         test "f(1) (2) 3" {
             "f(1) (2) 3"
-            == Ast.Call("f", [ Ast.Num 1; Ast.Num 2; Ast.Num 3 ])
+            == Ast.Call("f", [ Ast.Num 1; Ast.Block [ Ast.Num 2 ]; Ast.Num 3 ])
         }
         test "f(1) 2 3" {
             "f(1) 2 3"
@@ -157,12 +158,7 @@ let operators =
                     Ast.Call(
                         "map",
                         [
-                            Ast.Closure(
-                                [ "it" ],
-                                [
-                                    Ast.Call("__add", [ Ast.Call("it", []); Ast.Num 1.0 ])
-                                ]
-                            )
+                            Ast.Closure([ "it" ], Ast.Block[Ast.Call("__add", [ Ast.Call("it", []); Ast.Num 1.0 ])])
                         ]
                     )
                 ]
@@ -179,7 +175,12 @@ let operators =
                         [
                             Ast.List[Ast.Num 1
                                      Ast.Num 2]
-                            Ast.Call("map", [ Ast.Closure([ "it" ], [ Ast.Call("it", []) ]) ])
+                            Ast.Call(
+                                "map",
+                                [
+                                    Ast.Closure([ "it" ], Ast.Block[Ast.Call("it", [])])
+                                ]
+                            )
                         ]
                     )
                     Call("len", [])
@@ -188,12 +189,75 @@ let operators =
         }
     ]
 
+let bindings =
+
+    let (==) code expected = testParseExpr code expected
+
+    testGroup "bindings" [
+
+        testGroup "let" [
+            test "number" { "let x = 2" == Ast.Let(Pattern.Symbol "x", Ast.Num 2) }
+            test "list" {
+                "let x = [2]"
+                == Ast.Let(Pattern.Symbol "x", Ast.List [ Ast.Num 2 ])
+            }
+        ]
+
+        testGroup "match" [
+            test "number" {
+                "match x | 0 -> true | _ -> false"
+                == Ast.Match(
+                    Ast.Call("x", []),
+                    [
+                        {
+                            pattern = Pattern.Num 0
+                            body = Ast.Bool true
+                        }
+                        {
+                            pattern = Pattern.Underscore
+                            body = Ast.Bool false
+                        }
+                    ]
+                )
+            }
+            test "list" {
+                "match x | [] -> (true) | [0] -> (false)"
+                == Ast.Match(
+                    Ast.Call("x", []),
+                    [
+                        {
+                            pattern = Pattern.List []
+                            body = Ast.Block [ Ast.Bool true ]
+                        }
+                        {
+                            pattern = Pattern.List [ Pattern.Num 0 ]
+                            body = Ast.Block [ Ast.Bool false ]
+                        }
+                    ]
+                )
+            }
+        ]
+
+        testGroup "patterns" [
+            test "nil" { "let nil = nil" == Ast.Let(Pattern.Nil, Ast.Nil) }
+            test "true" { "let true = nil" == Ast.Let(Pattern.Bool true, Ast.Nil) }
+            test "false" { "let false = nil" == Ast.Let(Pattern.Bool false, Ast.Nil) }
+            test "number" { "let 3.14 = nil" == Ast.Let(Pattern.Num 3.14, Ast.Nil) }
+            test "string" { "let \"a\" = nil" == Ast.Let(Pattern.Str "a", Ast.Nil) }
+            test "list 0" { "let [] = nil" == Ast.Let(Pattern.List [], Ast.Nil) }
+            test "list 1" {
+                "let [1] = nil"
+                == Ast.Let(Pattern.List [ Pattern.Num 1 ], Ast.Nil)
+            }
+        ]
+    ]
+
 let parserTests =
     testGroup "parser" [
         primitives
         multiline
-        bindings
         lambdas
         calls
         operators
+        bindings
     ]
