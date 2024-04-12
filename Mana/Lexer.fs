@@ -262,6 +262,7 @@ type Lexer(source: string) =
         | "|" -> this.token TokenKind.Pipe
         | ":" -> this.token TokenKind.Colon
         | "->" -> this.token TokenKind.Arrow
+        | ".." -> this.token TokenKind.Rest
         | _ -> this.token TokenKind.Operator |> Token.withStr op
         |> this.emit
 
@@ -276,7 +277,7 @@ type Lexer(source: string) =
         | "false" -> this.token TokenKind.Bool |> Token.withBool false
         | "let" -> this.token TokenKind.Let
         | "match" -> this.token TokenKind.Match
-        | "_" -> this.token TokenKind.Underscore
+        | "_" -> this.token TokenKind.Wildcard
         | _ -> this.token TokenKind.Symbol |> Token.withStr id
         |> this.emit
 

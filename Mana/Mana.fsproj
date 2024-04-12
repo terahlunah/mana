@@ -13,6 +13,7 @@
         <Compile Include="Error.fs"/>
         <Compile Include="Lexer.fs"/>
         <Compile Include="Operator.fs"/>
+        <Compile Include="Pattern.fs"/>
         <Compile Include="Ast.fs"/>
         <Compile Include="Parser.fs"/>
         <Compile Include="Env.fs"/>

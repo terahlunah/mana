@@ -22,6 +22,7 @@ type ManaError =
     | LetBinding of string
     | PatternMatchingFailed
     | ClosureCantBeUsedAsKey
+    | MoreThanOneRestPattern
 
 type ManaResult<'T> = Result<'T, ManaError>
 

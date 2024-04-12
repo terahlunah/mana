@@ -12,23 +12,13 @@ type Ast =
     | Block of body: Ast list
     | Call of name: string * args: Ast list
     | Closure of args: string list * body: Ast
-    | Let of pattern: Pattern * value: Ast
+    | Let of pattern: Pattern * value: Ast * body: Ast
     | Match of expr: Ast * cases: MatchCase list
 
 and MatchCase = {
     pattern: Pattern
     body: Ast
 }
-
-and Pattern =
-    | Nil
-    | Bool of b: bool
-    | Num of n: float
-    | Str of s: string
-    | Symbol of s: string
-    | List of Pattern list
-    | Table of (Pattern * Pattern) list
-    | Underscore
 
 module Ast =
     let rec useImplicitIt (exprs: Ast list) : bool =
@@ -42,7 +32,7 @@ module Ast =
                     let ks = items |> List.map fst |> useImplicitIt
                     let vs = items |> List.map snd |> useImplicitIt
                     ks || vs
-                | Ast.Let(_, value) -> useImplicitIt [ value ]
+                | Ast.Let(_, value, body) -> useImplicitIt [ value; body ]
                 | Ast.Call("it", _) -> true
                 | Ast.Call(_, args) -> useImplicitIt args
                 | Ast.Closure(args, body) ->
@@ -78,7 +68,7 @@ module Ast =
             items
             |> List.map (fun (k, v) -> optimizeAndDesugar k, optimizeAndDesugar v)
             |> Ast.Table
-        | Ast.Let(name, value) -> Ast.Let(name, optimizeAndDesugar value)
+        | Ast.Let(name, value, body) -> Ast.Let(name, optimizeAndDesugar value, optimizeAndDesugar body)
         | Ast.Closure(args, body) -> Ast.Closure(args, optimizeAndDesugar body)
         | Ast.Block body ->
             match body with

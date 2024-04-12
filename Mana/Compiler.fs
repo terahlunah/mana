@@ -66,8 +66,9 @@ and compileBlock body : Callable =
         |> List.tryLast
         |> Option.defaultValue Value.Nil
 
-and compileLet (p: Pattern) (value: Ast) : Callable =
+and compileLet (p: Pattern) (value: Ast) (body:Ast): Callable =
     let value = compileExpr value
+    let body = compileExpr body
 
     fun env ->
         let v = value env
@@ -75,7 +76,7 @@ and compileLet (p: Pattern) (value: Ast) : Callable =
         let letEnv = env.localScope ()
 
         if bindPattern letEnv v p then
-            Value.Nil
+            body letEnv
         else
             raiseError (ManaError.PatternMatchingFailed)
 
@@ -103,7 +104,7 @@ and compileMatch (value: Ast) (cases: MatchCase list) : Callable =
 
 and bindPattern (env: Env<Value>) (value: Value) (pattern: Pattern) : bool =
     match pattern with
-    | Pattern.Underscore -> true
+    | Pattern.Wildcard -> true
     | Pattern.Nil -> value |> Value.isNil
     | Pattern.Bool b -> value |> Value.isBool b
     | Pattern.Num n -> value |> Value.isNum n
@@ -114,8 +115,27 @@ and bindPattern (env: Env<Value>) (value: Value) (pattern: Pattern) : bool =
     | Pattern.List patterns ->
         match value with
         | Value.List values ->
-            let bind = bindPattern env |> uncurry
-            List.zip values patterns |> List.forall bind
+            
+            if not <| Pattern.isCollectionPatternValid patterns then
+                raiseError ManaError.MoreThanOneRestPattern
+                
+            if Pattern.matchesSize values.Length patterns then
+                let restSize = values.Length - Pattern.minimumSize patterns
+                
+                let rec bindList vs ps =
+                    match vs, ps with
+                    | [], [] -> true
+                    | v::vs, Single p::ps ->
+                        bindPattern env v p && bindList vs ps
+                    | vs, Rest p::ps ->
+                        let rest = vs |> List.take restSize
+                        env.set(p, Value.List rest)
+                        bindList (vs |> List.skip restSize) ps
+                    | _ -> false
+                    
+                bindList values patterns
+            else
+                false
         | _ -> false
     | Pattern.Table patterns -> failwith "todo"
 
@@ -130,7 +150,7 @@ and compileExpr (expr: Ast) : Callable =
     | Ast.List exprs -> compileList exprs
     | Ast.Table pairs -> compileTable pairs
     | Ast.Block body -> compileBlock body
-    | Ast.Let(pattern, value) -> compileLet pattern value
+    | Ast.Let(pattern, value, body) -> compileLet pattern value body
     | Ast.Match(value, cases) -> compileMatch value cases
 
 and compileExprs exprs : Callable list = List.map compileExpr exprs

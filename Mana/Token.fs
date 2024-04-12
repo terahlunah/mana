@@ -20,7 +20,8 @@ type TokenKind =
     | Eq
     | Pipe
     | Operator
-    | Underscore
+    | Wildcard
+    | Rest
     | Arrow
     | NewLine
     | Eof

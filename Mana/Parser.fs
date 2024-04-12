@@ -1,5 +1,6 @@
 ﻿namespace Mana
 
+open Mana
 open Mana.Error
 open Yute
 open FsToolkit.ErrorHandling
@@ -245,7 +246,20 @@ type Parser(tokens: Token list) =
         this.parseList this.parseExpr |> Ast.List
 
     member this.parseListPattern() : Pattern =
-        this.parseList this.parsePattern |> Pattern.List
+
+        let parseListItem () =
+            if this.is TokenKind.Rest then
+                this.skip TokenKind.Rest
+                let p = this.expect TokenKind.Symbol
+
+                p
+                |> Token.asStr
+                |> Option.unwrap
+                |> CollectionPatternItem.Rest
+            else
+                this.parsePattern () |> CollectionPatternItem.Single
+
+        this.parseList parseListItem |> Pattern.List
 
     member this.parseTable(p: unit -> 'T) : ('T * 'T) list =
 
@@ -268,8 +282,8 @@ type Parser(tokens: Token list) =
     member this.parseTableExpr() : Ast =
         this.parseTable this.parseExpr |> Ast.Table
 
-    member this.parseTablePattern() : Pattern =
-        this.parseTable this.parsePattern |> Pattern.Table
+    member this.parseTablePattern() : Pattern = todo "Table pattern"
+    // this.parseTable this.parsePattern |> Pattern.Table
 
     member this.parseTable() : Ast =
 
@@ -297,9 +311,11 @@ type Parser(tokens: Token list) =
 
         this.skip TokenKind.Eq
 
-        let body = this.parseExpr ()
+        let value = this.parseExpr ()
 
-        Ast.Let(pattern, body)
+        let body = this.parseMany ()
+
+        Ast.Let(pattern, value, body)
 
     member this.parseMatch() : Ast =
         this.skip TokenKind.Match
@@ -474,9 +490,9 @@ type Parser(tokens: Token list) =
         | TokenKind.Nil ->
             this.skip TokenKind.Nil
             Pattern.Nil
-        | TokenKind.Underscore ->
-            this.skip TokenKind.Underscore
-            Pattern.Underscore
+        | TokenKind.Wildcard ->
+            this.skip TokenKind.Wildcard
+            Pattern.Wildcard
         | TokenKind.Bool ->
             let p = this.expect TokenKind.Bool
             p |> Token.asBool |> Option.unwrap |> Pattern.Bool
