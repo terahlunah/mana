@@ -1,9 +1,6 @@
 ﻿namespace Mana
 
-open System
 open System.Collections.Generic
-open Mana
-open Yute
 
 type Env<'T> = {
     mutable bindings: Dictionary<string, 'T>

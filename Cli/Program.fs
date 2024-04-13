@@ -3,7 +3,6 @@ open Mana.Error
 open PrettyPrompt
 open PrettyPrompt.Highlighting
 open Mana
-open Yute
 open System.IO
 
 open CommandLine
@@ -80,7 +79,9 @@ let run path argv =
 
         let code = File.ReadAllText path
 
-        m.run code |> Value.repr |> display
+        let output = m.run code |> Value.repr
+
+        printfn $"%s{output}"
 
         0
     with :? ManaException as e ->
@@ -99,7 +100,6 @@ let inline (|Success|Help|Version|Fail|) (result: ParserResult<'a>) =
     | :? NotParsed<'a> as notParsed -> Fail(notParsed.Errors)
     | _ -> failwith "invalid parser result"
 
-debug (Environment.GetCommandLineArgs())
 let args = Environment.GetCommandLineArgs() |> Array.skip 1
 let result = Parser.Default.ParseArguments<CliArgs>(args)
 

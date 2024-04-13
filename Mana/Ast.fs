@@ -1,7 +1,5 @@
 ﻿namespace Mana
 
-open Yute
-
 type Ast =
     | Nil
     | Bool of b: bool
@@ -12,7 +10,7 @@ type Ast =
     | Block of body: Ast list
     | Call of name: string * args: Ast list
     | Closure of args: string list * body: Ast
-    | Let of pattern: Pattern * value: Ast * body: Ast
+    | Let of pattern: Pattern * value: Ast
     | Match of expr: Ast * cases: MatchCase list
 
 and MatchCase = {
@@ -32,13 +30,13 @@ module Ast =
                     let ks = items |> List.map fst |> useImplicitIt
                     let vs = items |> List.map snd |> useImplicitIt
                     ks || vs
-                | Ast.Let(_, value, body) -> useImplicitIt [ value; body ]
+                | Ast.Let(_, value) -> useImplicitIt [ value ]
                 | Ast.Call("it", _) -> true
                 | Ast.Call(_, args) -> useImplicitIt args
                 | Ast.Closure(args, body) ->
                     useImplicitIt [ body ]
                     && args <> List.empty
-                    && not ("it" =? args)
+                    && not (args |> Seq.exists ((=) "it"))
                 | _ -> false
 
             useIt || useImplicitIt tail
@@ -68,7 +66,13 @@ module Ast =
             items
             |> List.map (fun (k, v) -> optimizeAndDesugar k, optimizeAndDesugar v)
             |> Ast.Table
-        | Ast.Let(name, value, body) -> Ast.Let(name, optimizeAndDesugar value, optimizeAndDesugar body)
+        | Ast.Let(name, value) -> Ast.Let(name, optimizeAndDesugar value)
+        | Ast.Match(value, cases) ->
+            Ast.Match(
+                optimizeAndDesugar value,
+                cases
+                |> List.map (fun case -> { case with body = optimizeAndDesugar case.body })
+            )
         | Ast.Closure(args, body) -> Ast.Closure(args, optimizeAndDesugar body)
         | Ast.Block body ->
             match body with

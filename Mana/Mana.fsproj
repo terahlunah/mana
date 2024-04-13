@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Utils.fs"/>
         <Compile Include="Span.fs"/>
         <Compile Include="Token.fs"/>
         <Compile Include="Error.fs"/>
@@ -20,13 +21,10 @@
         <Compile Include="Value.fs"/>
         <Compile Include="Compiler.fs"/>
         <Compile Include="Builtins.fs"/>
+        <Compile Include="Reflection.fs"/>
         <Compile Include="Interop.fs"/>
         <Compile Include="Library.fs"/>
         <EmbeddedResource Include="prelude.mana"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="C:\home\dev\yute\Yute\Yute.fsproj"/>
     </ItemGroup>
 
 </Project>

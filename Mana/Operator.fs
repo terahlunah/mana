@@ -126,6 +126,12 @@ module BinaryOperator =
             precedence = 70
             associativity = Left
         }
+        {
+            symbol = "++"
+            handler = "concat"
+            precedence = 10
+            associativity = Left
+        }
     ]
 
     let find symbol =

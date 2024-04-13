@@ -2,8 +2,7 @@
 
 open Mana
 open Mana.Error
-open Yute
-open FsToolkit.ErrorHandling
+open Mana.Utils
 
 type Parser(tokens: Token list) =
     let tokens = tokens
@@ -252,10 +251,7 @@ type Parser(tokens: Token list) =
                 this.skip TokenKind.Rest
                 let p = this.expect TokenKind.Symbol
 
-                p
-                |> Token.asStr
-                |> Option.unwrap
-                |> CollectionPatternItem.Rest
+                p |> Token.asStr |> Option.get |> CollectionPatternItem.Rest
             else
                 this.parsePattern () |> CollectionPatternItem.Single
 
@@ -313,9 +309,7 @@ type Parser(tokens: Token list) =
 
         let value = this.parseExpr ()
 
-        let body = this.parseMany ()
-
-        Ast.Let(pattern, value, body)
+        Ast.Let(pattern, value)
 
     member this.parseMatch() : Ast =
         this.skip TokenKind.Match
@@ -347,7 +341,7 @@ type Parser(tokens: Token list) =
 
     member this.parseCall() : Ast =
 
-        let name = this.current () |> Token.asStr |> Option.unwrap
+        let name = this.current () |> Token.asStr |> Option.get
 
         this.advance ()
 
@@ -374,7 +368,7 @@ type Parser(tokens: Token list) =
         Ast.Call(name, args)
 
     member this.parseArg() : string =
-        this.expect TokenKind.Symbol |> Token.asStr |> Option.unwrap
+        this.expect TokenKind.Symbol |> Token.asStr |> Option.get
 
     member this.parseLambda() : Ast =
 
@@ -432,13 +426,13 @@ type Parser(tokens: Token list) =
             Ast.Nil
         | TokenKind.Bool ->
             this.advance ()
-            Ast.Bool(Token.asBool ts |> Option.unwrap)
+            Ast.Bool(Token.asBool ts |> Option.get)
         | TokenKind.Num ->
             this.advance ()
-            Ast.Num(Token.asNum ts |> Option.unwrap)
+            Ast.Num(Token.asNum ts |> Option.get)
         | TokenKind.Str ->
             this.advance ()
-            Ast.Str(Token.asStr ts |> Option.unwrap)
+            Ast.Str(Token.asStr ts |> Option.get)
         | TokenKind.Symbol -> this.parseCall ()
         | TokenKind.Operator ->
             let op = this.parseUnaryOperator ()
@@ -456,7 +450,7 @@ type Parser(tokens: Token list) =
     member this.parseBinaryOperator(p) : Option<BinaryOperator> =
         let ts = this.current ()
 
-        let symbol = ts |> Token.asStr |> Option.unwrap
+        let symbol = ts |> Token.asStr |> Option.get
 
         let op =
             BinaryOperator.find symbol
@@ -471,7 +465,7 @@ type Parser(tokens: Token list) =
     member this.parseUnaryOperator() : UnaryOperator =
         let ts = this.expect TokenKind.Operator
 
-        let symbol = ts |> Token.asStr |> Option.unwrap
+        let symbol = ts |> Token.asStr |> Option.get
 
         UnaryOperator.find symbol
         |> Option.orRaise (this.error ManaError.ExpectedOperator |> ManaException)
@@ -480,7 +474,7 @@ type Parser(tokens: Token list) =
         if not <| this.is TokenKind.Operator then
             false
         else
-            let symbol = ts |> Token.asStr |> Option.unwrap
+            let symbol = ts |> Token.asStr |> Option.get
             UnaryOperator.find symbol |> Option.isSome
 
     member this.parsePattern() : Pattern =
@@ -495,16 +489,16 @@ type Parser(tokens: Token list) =
             Pattern.Wildcard
         | TokenKind.Bool ->
             let p = this.expect TokenKind.Bool
-            p |> Token.asBool |> Option.unwrap |> Pattern.Bool
+            p |> Token.asBool |> Option.get |> Pattern.Bool
         | TokenKind.Num ->
             let p = this.expect TokenKind.Num
-            p |> Token.asNum |> Option.unwrap |> Pattern.Num
+            p |> Token.asNum |> Option.get |> Pattern.Num
         | TokenKind.Str ->
             let p = this.expect TokenKind.Str
-            p |> Token.asStr |> Option.unwrap |> Pattern.Str
+            p |> Token.asStr |> Option.get |> Pattern.Str
         | TokenKind.Symbol ->
             let p = this.expect TokenKind.Symbol
-            p |> Token.asStr |> Option.unwrap |> Pattern.Symbol
+            p |> Token.asStr |> Option.get |> Pattern.Symbol
         | TokenKind.LBracket -> this.parseListPattern ()
         | TokenKind.Hash -> this.parseTablePattern ()
         | _ -> raiseError (this.error (ManaError.ExpectedExpr(got = ts.kind)))

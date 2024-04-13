@@ -1,9 +1,7 @@
 module Tests.Interop
 
-open Mana.Interop
 open Mana
-open Yute.Testing
-open Yute
+open Tests.Testing
 
 type Bar =
     | Alpha

@@ -1,15 +1,14 @@
 ﻿module Tests.Optimizer
 
 open Mana
-open Yute.Testing
-open Yute
+open Tests.Testing
 
 let testOptimize code expected =
     let tokens = Lexer.lex code
     let ast = Parser.parseMany tokens
 
-    let got = sdebug ast
-    let expected = sdebug expected
+    let got = sprintf $"%A{ast}"
+    let expected = sprintf $"%A{expected}"
 
     Test.equalMessage code got expected
 

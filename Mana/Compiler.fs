@@ -2,7 +2,6 @@ module Mana.Compiler
 
 open Mana
 open Mana.Error
-open Yute
 
 type Callable = Env<Value> -> Value
 let rec compileUnit = fun env -> Value.Nil
@@ -66,9 +65,8 @@ and compileBlock body : Callable =
         |> List.tryLast
         |> Option.defaultValue Value.Nil
 
-and compileLet (p: Pattern) (value: Ast) (body:Ast): Callable =
+and compileLet (p: Pattern) (value: Ast): Callable =
     let value = compileExpr value
-    let body = compileExpr body
 
     fun env ->
         let v = value env
@@ -76,7 +74,8 @@ and compileLet (p: Pattern) (value: Ast) (body:Ast): Callable =
         let letEnv = env.localScope ()
 
         if bindPattern letEnv v p then
-            body letEnv
+            env.merge letEnv
+            Value.Nil
         else
             raiseError (ManaError.PatternMatchingFailed)
 
@@ -150,7 +149,7 @@ and compileExpr (expr: Ast) : Callable =
     | Ast.List exprs -> compileList exprs
     | Ast.Table pairs -> compileTable pairs
     | Ast.Block body -> compileBlock body
-    | Ast.Let(pattern, value, body) -> compileLet pattern value body
+    | Ast.Let(pattern, value) -> compileLet pattern value
     | Ast.Match(value, cases) -> compileMatch value cases
 
 and compileExprs exprs : Callable list = List.map compileExpr exprs

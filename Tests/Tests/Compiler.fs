@@ -1,8 +1,7 @@
 module Tests.Compiler
 
 open Mana
-open Yute.Testing
-open Yute
+open Tests.Testing
 
 let inline runTest (code: string) (expected: string) =
 

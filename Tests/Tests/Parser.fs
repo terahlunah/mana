@@ -1,15 +1,14 @@
 ﻿module Tests.Parser
 
 open Mana
-open Yute.Testing
-open Yute
+open Tests.Testing
 
 let testParseExpr code expected =
     let tokens = Lexer.lex code
     let ast = Parser.parseExprRaw tokens
 
-    let got = sdebug ast
-    let expected = sdebug expected
+    let got = sprintf $"%A{ast}"
+    let expected = sprintf $"%A{expected}"
 
     Test.equalMessage code got expected
 
@@ -17,8 +16,8 @@ let testParseMany code expected =
     let tokens = Lexer.lex code
     let ast = Parser.parseManyRaw tokens
 
-    let got = sdebug ast
-    let expected = sdebug expected
+    let got = sprintf $"%A{ast}"
+    let expected = sprintf $"%A{expected}"
 
     Test.equalMessage code got expected
 
@@ -231,45 +230,23 @@ let bindings =
         ]
 
         testGroup "patterns" [
-            test "nil" {
-                "let nil = nil"
-                == Ast.Let(Pattern.Nil, Ast.Nil, Ast.Block [])
-            }
-            test "true" {
-                "let true = nil"
-                == Ast.Let(Pattern.Bool true, Ast.Nil, Ast.Block [])
-            }
-            test "false" {
-                "let false = nil"
-                == Ast.Let(Pattern.Bool false, Ast.Nil, Ast.Block [])
-            }
-            test "number" {
-                "let 3.14 = nil"
-                == Ast.Let(Pattern.Num 3.14, Ast.Nil, Ast.Block [])
-            }
-            test "string" {
-                "let \"a\" = nil"
-                == Ast.Let(Pattern.Str "a", Ast.Nil, Ast.Block [])
-            }
+            test "nil" { "let nil = nil" == Ast.Let(Pattern.Nil, Ast.Nil) }
+            test "true" { "let true = nil" == Ast.Let(Pattern.Bool true, Ast.Nil) }
+            test "false" { "let false = nil" == Ast.Let(Pattern.Bool false, Ast.Nil) }
+            test "number" { "let 3.14 = nil" == Ast.Let(Pattern.Num 3.14, Ast.Nil) }
+            test "string" { "let \"a\" = nil" == Ast.Let(Pattern.Str "a", Ast.Nil) }
             test "symbol" {
                 "let x = [2]"
-                == Ast.Let(Pattern.Symbol "x", Ast.List [ Ast.Num 2 ], Ast.Block [])
+                == Ast.Let(Pattern.Symbol "x", Ast.List [ Ast.Num 2 ])
             }
-            test "list 0" {
-                "let [] = nil"
-                == Ast.Let(Pattern.List [], Ast.Nil, Ast.Block [])
-            }
+            test "list 0" { "let [] = nil" == Ast.Let(Pattern.List [], Ast.Nil) }
             test "list 1" {
                 "let [1] = nil"
-                == Ast.Let(Pattern.List [ ListPatternItem.Single(Pattern.Num 1) ], Ast.Nil, Ast.Block [])
+                == Ast.Let(Pattern.List [ ListPatternItem.Single(Pattern.Num 1) ], Ast.Nil)
             }
             test "list symbol" {
                 "let [a] = [1]"
-                == Ast.Let(
-                    Pattern.List [ ListPatternItem.Single(Pattern.Symbol "a") ],
-                    Ast.List [ Ast.Num 1 ],
-                    Ast.Block []
-                )
+                == Ast.Let(Pattern.List [ ListPatternItem.Single(Pattern.Symbol "a") ], Ast.List [ Ast.Num 1 ])
             }
         ]
     ]

@@ -2,8 +2,6 @@
 
 open Mana
 open Mana.Error
-open Yute
-open FsToolkit.ErrorHandling
 
 type Lexer(source: string) =
     let mutable source: string = source
@@ -60,7 +58,7 @@ type Lexer(source: string) =
     member this.trace() =
         let src =
             source
-            |> String.toList
+            |> Seq.toList
             |> List.map (fun c ->
                 match c with
                 | '\r' -> ""
@@ -229,8 +227,10 @@ type Lexer(source: string) =
             num <- $"%s{num}.%s{fract}"
 
         let num =
-            Float.parse num
-            |> Option.orRaise (ManaException(this.makeError (ManaError.ParseNum num)))
+            try
+                float num
+            with _ ->
+                raiseError (this.makeError (ManaError.ParseNum num))
 
         this.token TokenKind.Num |> Token.withNum num |> this.emit
 
@@ -255,7 +255,14 @@ type Lexer(source: string) =
     member this.readOperator() =
         let mutable op = ""
 
-        whileSome (fun _ -> this.tryReadFn isOperator) (fun c -> op <- op + string c)
+        let rec loop () =
+            match this.tryReadFn isOperator with
+            | Some c ->
+                op <- op + string c
+                loop ()
+            | None -> ()
+
+        loop ()
 
         match op with
         | "=" -> this.token TokenKind.Eq
@@ -267,18 +274,25 @@ type Lexer(source: string) =
         |> this.emit
 
     member this.readSymbol() =
-        let mutable id = ""
+        let mutable s = ""
 
-        whileSome (fun _ -> this.tryReadFn isSymbol) (fun c -> id <- id + string c)
+        let rec loop () =
+            match this.tryReadFn isSymbol with
+            | Some c ->
+                s <- s + string c
+                loop ()
+            | None -> ()
 
-        match id with
+        loop ()
+
+        match s with
         | "nil" -> this.token TokenKind.Nil
         | "true" -> this.token TokenKind.Bool |> Token.withBool true
         | "false" -> this.token TokenKind.Bool |> Token.withBool false
         | "let" -> this.token TokenKind.Let
         | "match" -> this.token TokenKind.Match
         | "_" -> this.token TokenKind.Wildcard
-        | _ -> this.token TokenKind.Symbol |> Token.withStr id
+        | _ -> this.token TokenKind.Symbol |> Token.withStr s
         |> this.emit
 
 module Lexer =

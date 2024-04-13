@@ -1,7 +1,6 @@
 namespace Mana
 
 open System
-open Yute
 open Mana.Error
 
 [<CustomComparison; CustomEquality>]

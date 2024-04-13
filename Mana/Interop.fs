@@ -6,7 +6,6 @@ open System.Collections.Generic
 open System.Reflection
 open Microsoft.FSharp.Reflection
 open Mana
-open Yute.Reflection
 
 let rec (|FSharpList|_|) (env: Env<Value>) (obj: obj) =
     match obj with

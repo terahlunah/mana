@@ -1,7 +1,5 @@
 namespace Mana
 
-open Yute
-
 type Span = {
     source: string
     start: int
@@ -14,7 +12,7 @@ type Span = {
     member self.pretty() =
         let src =
             self.source
-            |> String.toList
+            |> Seq.toList
             |> List.map (fun c ->
                 match c with
                 | '\r' -> ""
@@ -38,7 +36,7 @@ module Span =
     let display span =
         let src =
             span.source
-            |> String.toList
+            |> Seq.toList
             |> List.map (fun c ->
                 match c with
                 | '\n' -> "↵"

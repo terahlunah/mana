@@ -1,6 +1,6 @@
 open System
 
-open Yute.Testing
+open Tests.Testing
 open Tests.Parser
 open Tests.Optimizer
 open Tests.Interop

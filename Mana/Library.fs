@@ -33,12 +33,9 @@ type Mana() as this =
     member this.run(code: string) : Value =
         let tokens = code |> Lexer.lex
 
-        // for t in tokens do
-        //     printfn $"%A{t.kind} %A{t.data}"
+        let ast = tokens |> Parser.parseMany
 
-        let script = tokens |> Parser.parseMany
-
-        let runScript = Compiler.compileExpr script
+        let runScript = Compiler.compileExpr ast
 
         runScript globalEnv
 

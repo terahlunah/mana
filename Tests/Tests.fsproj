@@ -6,21 +6,21 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Parser.fs"/>
-        <Compile Include="Optimizer.fs"/>
-        <Compile Include="Interop.fs"/>
-        <Compile Include="Compiler.fs"/>
-        <!--        <Compile Include="Eval.fs"/>-->
-        <!--        <Compile Include="Macro.fs"/>-->
-        <!--        <Compile Include="Indexing.fs"/>-->
-        <!--        <Compile Include="Format.fs"/>-->
-        <!--        <Compile Include="Interop.fs"/>-->
+        <Compile Include="Console.fs"/>
+        <Compile Include="Testing.fs"/>
+        <Compile Include="Tests\Parser.fs"/>
+        <Compile Include="Tests\Optimizer.fs"/>
+        <Compile Include="Tests\Interop.fs"/>
+        <Compile Include="Tests\Compiler.fs"/>
         <Compile Include="Main.fs"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Mana\Mana.fsproj"/>
-        <ProjectReference Include="..\..\Yute\Yute\Yute.fsproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="DiffPlex" Version="1.7.2"/>
     </ItemGroup>
 
 </Project>

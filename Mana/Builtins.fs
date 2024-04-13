@@ -1,9 +1,7 @@
 module Mana.Builtins
 
-open FsToolkit.ErrorHandling
 open Mana
 open Mana.Error
-open Yute
 open System
 
 // Arithmetic
@@ -92,11 +90,13 @@ let bor env args =
 // IO
 
 let debug env args =
-    args |> List.map Value.repr |> String.concat "" |> debug
+    let x = args |> List.map Value.repr |> String.concat ""
+    printfn $"%A{x}"
     Value.Nil
 
 let display env args =
-    args |> List.map Value.repr |> String.concat "" |> display
+    let x = args |> List.map Value.repr |> String.concat ""
+    printfn $"%s{x}"
     Value.Nil
 
 let rec cond env args =
@@ -126,7 +126,9 @@ let concat env args =
     match args with
     | [ Value.Str a; Value.Str b ] -> String.concat "" [ a; b ] |> Value.Str
     | [ Value.List a; Value.List b ] -> List.concat [ a; b ] |> Value.List
-    | [ Value.Table a; Value.Table b ] -> Map.merge a b |> Value.Table
+    | [ Value.Table a; Value.Table b ] ->
+        Map.fold (fun acc key value -> Map.add key value acc) a b
+        |> Value.Table
     | [ _ ] -> raiseError (ManaError.InvalidArguments $"both `concat` arguments must be lists, tables or strings")
     | _ -> raiseError (ManaError.InvalidArguments "`concat` takes 2 arguments")
 
@@ -151,23 +153,32 @@ let head env args =
 let tail env args =
     match args with
     | [ Value.List x ] -> List.tail x |> Value.List
-    | [ Value.Str x ] -> Seq.tail x |> String.Concat |> Value.Str
-    | [ v ] -> raiseError (ManaError.InvalidArguments $"`tail` argument must be a list or a string")
+    | [ Value.Str x ] -> Seq.tail x |> string |> Value.Str
+    | [ _ ] -> raiseError (ManaError.InvalidArguments $"`tail` argument must be a list or a string")
     | _ -> raiseError (ManaError.InvalidArguments "`tail` takes 1 argument")
 
-// let nth env args =
-//     match args with
-//     | [ Value.List x; Value.Num n ] -> List.tryItem (int n) x |> Option.defaultValue Value.Nil
-//     | [ Value.Str x; Value.Num n ] ->
-//         Seq.tryItem (int n) x
-//         |> Option.map (string >> Value.Str)
-//         |> Option.defaultValue Value.Nil
-//     | [ _; Value.Num _ ] -> raiseError (ManaError.InvalidArguments $"`nth` first argument must be a list or a string")
-//     | [ Value.Str _ | Value.List _; _ ] ->
-//         raiseError (ManaError.InvalidArguments $"`nth` second argument must be a number")
-//     | _ -> raiseError (ManaError.InvalidArguments "`nth` takes 2 arguments")
+let rev env args =
+    match args with
+    | [ Value.List x ] -> List.rev x |> Value.List
+    | [ Value.Str x ] -> Seq.rev x |> string |> Value.Str
+    | [ _ ] -> raiseError (ManaError.InvalidArguments $"`rev` argument must be a list or a string")
+    | _ -> raiseError (ManaError.InvalidArguments "`rev` takes 1 argument")
 
-//
+let nth env args =
+    match args with
+    | [ Value.List x; Value.Num n ] ->
+        let n = if n < 0 then x.Length - (int n) else (int n)
+        List.tryItem (int n) x |> Option.defaultValue Value.Nil
+    | [ Value.Str x; Value.Num n ] ->
+        let n = if n < 0 then x.Length - (int n) else (int n)
+
+        Seq.tryItem (int n) x
+        |> Option.map (string >> Value.Str)
+        |> Option.defaultValue Value.Nil
+    | [ _; Value.Num _ ] -> raiseError (ManaError.InvalidArguments $"`nth` first argument must be a list or a string")
+    | [ Value.Str _ | Value.List _; _ ] ->
+        raiseError (ManaError.InvalidArguments $"`nth` second argument must be a number")
+    | _ -> raiseError (ManaError.InvalidArguments "`nth` takes 2 arguments")
 
 let env: Env<Value> =
     Env.empty ()
@@ -202,6 +213,9 @@ let env: Env<Value> =
     |> Env.set "when" (Value.Closure condWhen)
 
     // Seq
+    |> Env.set "concat" (Value.Closure concat)
     |> Env.set "head" (Value.Closure head)
     |> Env.set "tail" (Value.Closure tail)
     |> Env.set "len" (Value.Closure len)
+    |> Env.set "rev" (Value.Closure rev)
+    |> Env.set "nth" (Value.Closure nth)
