@@ -269,6 +269,7 @@ type Lexer(source: string) =
         | "|" -> this.token TokenKind.Pipe
         | ":" -> this.token TokenKind.Colon
         | "->" -> this.token TokenKind.Arrow
+        | "." -> this.token TokenKind.Dot
         | ".." -> this.token TokenKind.Rest
         | _ -> this.token TokenKind.Operator |> Token.withStr op
         |> this.emit

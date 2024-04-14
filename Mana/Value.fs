@@ -13,6 +13,40 @@ type Value =
     | Table of items: Map<Value, Value>
     | Closure of handler: (Env<Value> -> List<Value> -> Value)
 
+    [<CompiledName("AsBool")>]
+    member this.asBool =
+        match this with
+        | Bool b -> b
+        | _ -> failwith "Invalid Value access"
+
+    [<CompiledName("AsNum")>]
+    member this.asNum =
+        match this with
+        | Num n -> n
+        | _ -> failwith "Invalid Value access"
+
+    [<CompiledName("AsStr")>]
+    member this.asStr =
+        match this with
+        | Str s -> s
+        | _ -> failwith "Invalid Value access"
+
+    [<CompiledName("AsList")>]
+    member this.asList =
+        match this with
+        | List l -> l
+        | _ -> failwith "Invalid Value access"
+
+    [<CompiledName("AsTable")>]
+    member this.asTable =
+        match this with
+        | Table t -> t
+        | _ -> failwith "Invalid Value access"
+
+    static member NewFuncClosure(handler: System.Func<Env<Value>, ResizeArray<Value>, Value>) =
+        let h (env: Env<Value>) (args: List<Value>) = handler.Invoke(env, ResizeArray args)
+        Value.Closure h
+
     member this.Rank() =
         match this with
         | Nil -> 0
@@ -70,7 +104,6 @@ type Value =
         | Table items -> hash items
 
 module Value =
-
     let isTrue =
         function
         | Bool false
@@ -102,16 +135,6 @@ module Value =
         function
         | Str s -> s = value
         | _ -> false
-
-    let asList (v: Value) =
-        match v with
-        | List(items) -> Some items
-        | _ -> None
-
-    let asTable (v: Value) =
-        match v with
-        | Table(items) -> Some items
-        | _ -> None
 
     let rec repr (v: Value) =
         match v with

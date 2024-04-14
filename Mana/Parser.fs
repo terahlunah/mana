@@ -11,7 +11,7 @@ type Parser(tokens: Token list) =
 
     // do
     //     for t in tokens do
-    //         displayEscaped t
+    //         printfn $"{t}"
 
     member this.error kind = kind
 
@@ -90,6 +90,10 @@ type Parser(tokens: Token list) =
         let ts = this.current ()
         ts.kind = kind
 
+    member this.isData(kind, data) =
+        let ts = this.current ()
+        ts.kind = kind && ts.data = Some(data)
+
     member this.isCloser() =
         let ts = this.current ()
 
@@ -101,6 +105,7 @@ type Parser(tokens: Token list) =
         | Comma
         | Operator
         | Pipe
+        | Dot
         | Eof -> true
         | _ -> false
 
@@ -206,7 +211,7 @@ type Parser(tokens: Token list) =
         this.skipAll TokenKind.NewLine
 
         while not (this.is TokenKind.Eof) do
-            let e = this.parseExpr 0
+            let e = this.parseExpr ()
             items <- items @ [ e ]
             this.skipAll TokenKind.NewLine
 
@@ -291,9 +296,9 @@ type Parser(tokens: Token list) =
             TokenKind.RBracket,
             (fun _ ->
                 this.skipAll TokenKind.NewLine
-                let k = this.parseExpr 0
+                let k = this.parseExpr ()
                 this.skip TokenKind.Colon
-                let v = this.parseExpr 0
+                let v = this.parseExpr ()
                 this.skipAll TokenKind.NewLine
                 k, v
             )
@@ -339,33 +344,36 @@ type Parser(tokens: Token list) =
 
         Ast.Match(v, cases)
 
-    member this.parseCall() : Ast =
+    member this.parseCall(insideCall: bool) : Ast =
 
         let name = this.current () |> Token.asStr |> Option.get
 
         this.advance ()
 
-        let mutable args = []
+        if insideCall then
+            Ast.Call(name, [])
+        else
+            let mutable args = []
 
-        if this.is TokenKind.LParen then
-            args <-
-                this.parseSeqSeparatedAndDelimitedBy (
-                    TokenKind.LParen,
-                    TokenKind.Comma,
-                    TokenKind.RParen,
-                    (fun _ ->
-                        this.skipAll TokenKind.NewLine
-                        let e = this.parseExpr 0
-                        this.skipAll TokenKind.NewLine
-                        e
+            if this.is TokenKind.LParen then
+                args <-
+                    this.parseSeqSeparatedAndDelimitedBy (
+                        TokenKind.LParen,
+                        TokenKind.Comma,
+                        TokenKind.RParen,
+                        (fun _ ->
+                            this.skipAll TokenKind.NewLine
+                            let e = this.parseExpr (0, true)
+                            this.skipAll TokenKind.NewLine
+                            e
+                        )
                     )
-                )
 
-        while not <| this.isCloser () do
-            // Trailing args
-            args <- args @ [ this.parseExpr 100 ]
+            while not <| this.isCloser () do
+                // Trailing args
+                args <- args @ [ this.parseExpr (0, true) ]
 
-        Ast.Call(name, args)
+            Ast.Call(name, args)
 
     member this.parseArg() : string =
         this.expect TokenKind.Symbol |> Token.asStr |> Option.get
@@ -411,7 +419,7 @@ type Parser(tokens: Token list) =
 
         Ast.Closure(args, body |> Ast.Block)
 
-    member this.parseElement() : Ast =
+    member this.parseElement(insideCall: bool) : Ast =
         let ts = this.current ()
 
         match ts.kind with
@@ -433,11 +441,11 @@ type Parser(tokens: Token list) =
         | TokenKind.Str ->
             this.advance ()
             Ast.Str(Token.asStr ts |> Option.get)
-        | TokenKind.Symbol -> this.parseCall ()
+        | TokenKind.Symbol -> this.parseCall insideCall
         | TokenKind.Operator ->
             let op = this.parseUnaryOperator ()
             let q = op.precedence
-            let e = this.parseExpr q
+            let e = this.parseExpr (q, insideCall)
             Ast.Call(op.handler, [ e ])
         | _ -> raiseError (this.error (ExpectedExpr ts.kind))
 
@@ -503,11 +511,30 @@ type Parser(tokens: Token list) =
         | TokenKind.Hash -> this.parseTablePattern ()
         | _ -> raiseError (this.error (ManaError.ExpectedExpr(got = ts.kind)))
 
-    member this.parseExpr() : Ast = this.parseExpr 0
+    member this.parseExpr() : Ast = this.parseExpr (0, false)
 
-    member this.parseExpr(p: int) : Ast =
-        let left = this.parseElement ()
+    member this.parseExpr(p: int, insideCall: bool) : Ast =
+        let mutable left = this.parseElement insideCall
 
+        // Chain operator
+        let rec chain left =
+            if this.trySkip TokenKind.Dot then
+                if this.is TokenKind.Symbol then
+                    match this.parseCall (false) with
+                    | Ast.Call(name, args) ->
+                        let left = Ast.Call(name, left :: args)
+                        chain left
+                    | _ -> failwith "unreachable"
+                else
+                    raiseError (ManaError.ExpectedSymbol(this.current().kind))
+
+            else
+                left
+
+        if (not insideCall) then
+            left <- chain left
+
+        // Binary operators
         let rec loop left =
             let op = this.tryParseBinaryOperator p
 
@@ -518,7 +545,7 @@ type Parser(tokens: Token list) =
                     | Left -> op.precedence + 1
                     | Right -> op.precedence
 
-                let right = this.parseExpr q
+                let right = this.parseExpr (q, insideCall)
                 let e = Ast.Call(op.handler, [ left; right ])
                 loop e
             | None -> left

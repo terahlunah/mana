@@ -121,12 +121,6 @@ module BinaryOperator =
             associativity = Left
         }
         {
-            symbol = "."
-            handler = "__chain"
-            precedence = 70
-            associativity = Left
-        }
-        {
             symbol = "++"
             handler = "concat"
             precedence = 10

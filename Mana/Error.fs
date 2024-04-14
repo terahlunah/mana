@@ -10,7 +10,7 @@ type ManaError =
     | ExpectedDefinition of got: TokenKind
     | ExpectedLiteral of got: TokenKind
     | ExpectedExpr of got: TokenKind
-    | ExpectedTerm of got: TokenKind
+    | ExpectedSymbol of got: TokenKind
     | InvalidArguments of string
     | SymbolNotFound of name: string
     | UnknownOperator of name: string

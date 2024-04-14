@@ -24,6 +24,7 @@ type TokenKind =
     | Rest
     | Arrow
     | NewLine
+    | Dot
     | Eof
 
 type TokenData =

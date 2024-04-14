@@ -55,10 +55,7 @@ module Ast =
             | "__div", [ Ast.Num a; Ast.Num b ] -> Ast.Num(a / b)
             | "__pow", [ Ast.Num a; Ast.Num b ] -> Ast.Num(a ** b)
             | "__mod", [ Ast.Num a; Ast.Num b ] -> Ast.Num(a % b)
-
-            // Desugaring __chain virtual method
-            | "__chain", [ x; Ast.Call(name, args) ] ->
-                Ast.Call(name, optimizeAndDesugar x :: List.map optimizeAndDesugar args)
+            // Default case
             | _ -> Ast.Call(name, args)
 
         | Ast.List(items) -> items |> List.map optimizeAndDesugar |> Ast.List

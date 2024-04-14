@@ -45,7 +45,7 @@ range gridSize (width - gridSize) gridSize { |x|
     range gridSize (height - gridSize) gridSize { |y|
         noStroke
         fill 255
-        rect x-1, y-1, 3, 3
+        rect x-1 y-1 3 3
         stroke 255, 100
         line x y (width/2) (height/2)
     }

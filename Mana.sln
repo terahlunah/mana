@@ -6,6 +6,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Mana", "Mana\Mana.fsproj", 
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tests", "Tests\Tests.fsproj", "{9EB369FB-FB9D-41FC-A3E7-5C73122FF097}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example", "Example\Example.csproj", "{2E51CBFC-B55D-4574-A612-D8EA82752169}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{9EB369FB-FB9D-41FC-A3E7-5C73122FF097}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9EB369FB-FB9D-41FC-A3E7-5C73122FF097}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9EB369FB-FB9D-41FC-A3E7-5C73122FF097}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E51CBFC-B55D-4574-A612-D8EA82752169}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E51CBFC-B55D-4574-A612-D8EA82752169}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E51CBFC-B55D-4574-A612-D8EA82752169}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E51CBFC-B55D-4574-A612-D8EA82752169}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

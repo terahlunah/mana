@@ -150,16 +150,12 @@ let operators =
         test "chain" {
             "[1, 2].map {\nit + 1\n}"
             == Ast.Call(
-                "__chain",
+                "map",
                 [
                     Ast.List[Ast.Num 1
                              Ast.Num 2]
-                    Ast.Call(
-                        "map",
-                        [
-                            Ast.Closure([ "it" ], Ast.Block[Ast.Call("__add", [ Ast.Call("it", []); Ast.Num 1.0 ])])
-                        ]
-                    )
+                    Ast.Closure([ "it" ], Ast.Block[Ast.Call("__add", [ Ast.Call("it", []); Ast.Num 1.0 ])])
+
                 ]
             )
         }
@@ -167,22 +163,17 @@ let operators =
         test "nested chain" {
             "[1, 2].map {it}.len"
             == Ast.Call(
-                "__chain",
+                "len",
                 [
                     Ast.Call(
-                        "__chain",
+                        "map",
                         [
                             Ast.List[Ast.Num 1
                                      Ast.Num 2]
-                            Ast.Call(
-                                "map",
-                                [
-                                    Ast.Closure([ "it" ], Ast.Block[Ast.Call("it", [])])
-                                ]
-                            )
+                            Ast.Closure([ "it" ], Ast.Block[Ast.Call("it", [])])
                         ]
                     )
-                    Call("len", [])
+
                 ]
             )
         }
