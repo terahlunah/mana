@@ -10,7 +10,7 @@ Hence, the language design is trying to balance the following properties:
 - ### Minimalist
   - Simple to parse and run.
   - Contain the minimum it needs to be useful and delegate as needed to the host.
-  - Light and consistent syntax
+  - Light and consistent syntax.
 - ### Expressive
   - Primitives should be powerful enough to support most use cases out of the box.
   - Changing behavior should only need minimal code changes.
@@ -174,8 +174,8 @@ match [1, 2, 3]
 The interpreter is written in `F#` but the language can be used from any `dotnet` language, including `C#`.
 
 See the usage examples:
-- [F# example](Example Fsharp/Program.fs)
-- [C# example](Example Csharp/Program.cs)
+- [F# example](Example%20Fsharp/Program.fs)
+- [C# example](Example%20Csharp/Program.cs)
 
 ---
 
