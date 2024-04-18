@@ -21,10 +21,11 @@ type TokenKind =
     | Pipe
     | Operator
     | Wildcard
-    | Rest
-    | Arrow
-    | NewLine
     | Dot
+    | DoubleDot
+    | RightArrow
+    | LeftArrow
+    | NewLine
     | Eof
 
 type TokenData =

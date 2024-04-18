@@ -14,6 +14,20 @@ type Env<'T> = {
 
     member self.localScope() = { Env<'T>.empty () with parent = Some self }
     member self.set(k, v) = self.bindings.[k] <- v
+    
+    member self.assign(k, v) =
+        if self.bindings.ContainsKey k then
+            self.bindings.[k] <- v
+            true
+        else
+            false
+            
+    member self.globalAssign(k, v) =
+        if self.bindings.ContainsKey k then
+            self.bindings.[k] <- v
+            true
+        else
+            self.parent |> Option.map (_.globalAssign(k,v)) |> Option.defaultValue false
 
     member self.get k =
         let mutable env = self

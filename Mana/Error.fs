@@ -23,6 +23,7 @@ type ManaError =
     | PatternMatchingFailed
     | ClosureCantBeUsedAsKey
     | MoreThanOneRestPattern
+    | OnlyListsCanBeSplatted
 
 type ManaResult<'T> = Result<'T, ManaError>
 

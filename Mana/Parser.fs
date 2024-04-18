@@ -80,6 +80,15 @@ type Parser(tokens: Token list) =
         else
             false
 
+    member this.trySkipData(kind, data) =
+        let ts = this.current ()
+
+        if ts.kind = kind && ts.data = Some(data) then
+            this.advance ()
+            true
+        else
+            false
+
     member this.skipData(kind, data) =
         let ts = this.next ()
 
@@ -246,14 +255,25 @@ type Parser(tokens: Token list) =
             )
         )
 
+    member this.parseSplat() : Ast =
+        this.skip TokenKind.DoubleDot
+        this.parseExpr ()
+
     member this.parseListExpr() : Ast =
-        this.parseList this.parseExpr |> Ast.List
+
+        this.parseList (fun _ ->
+            if this.is TokenKind.DoubleDot then
+                this.parseSplat () |> ListExpr.Splat
+            else
+                this.parseExpr () |> ListExpr.Elem
+        )
+        |> Ast.List
 
     member this.parseListPattern() : Pattern =
 
         let parseListItem () =
-            if this.is TokenKind.Rest then
-                this.skip TokenKind.Rest
+            if this.is TokenKind.DoubleDot then
+                this.skip TokenKind.DoubleDot
                 let p = this.expect TokenKind.Symbol
 
                 p |> Token.asStr |> Option.get |> CollectionPatternItem.Rest
@@ -316,6 +336,16 @@ type Parser(tokens: Token list) =
 
         Ast.Let(pattern, value)
 
+    member this.parseAssign() : Ast =
+
+        let symbol = this.expect TokenKind.Symbol |> Token.asStr |> Option.get
+
+        this.skip TokenKind.Eq
+
+        let value = this.parseExpr ()
+
+        Ast.Assign(symbol, value)
+
     member this.parseMatch() : Ast =
         this.skip TokenKind.Match
 
@@ -331,12 +361,20 @@ type Parser(tokens: Token list) =
                 (fun _ ->
                     this.skipAll TokenKind.NewLine
                     let pattern = this.parsePattern ()
-                    this.skip TokenKind.Arrow
+
+                    let guard =
+                        if this.trySkipData (TokenKind.Symbol, TokenData.Str "if") then
+                            this.parseExpr () |> Some
+                        else
+                            None
+
+                    this.skip TokenKind.RightArrow
                     let body = this.parseExpr ()
                     this.skipAll TokenKind.NewLine
 
                     {
                         pattern = pattern
+                        guard = guard
                         body = body
                     }
                 )
@@ -441,7 +479,11 @@ type Parser(tokens: Token list) =
         | TokenKind.Str ->
             this.advance ()
             Ast.Str(Token.asStr ts |> Option.get)
-        | TokenKind.Symbol -> this.parseCall insideCall
+        | TokenKind.Symbol ->
+            if this.peekIs TokenKind.Eq && not insideCall then
+                this.parseAssign ()
+            else
+                this.parseCall insideCall
         | TokenKind.Operator ->
             let op = this.parseUnaryOperator ()
             let q = op.precedence
@@ -557,5 +599,5 @@ module Parser =
     let parseExprRaw tokens = Parser(tokens).parseExpr ()
     let parseManyRaw tokens = Parser(tokens).parseMany ()
 
-    let parseExpr = parseExprRaw >> Ast.optimizeAndDesugar
-    let parseMany = parseManyRaw >> Ast.optimizeAndDesugar
+    let parseExpr = parseExprRaw >> Ast.optimize
+    let parseMany = parseManyRaw >> Ast.optimize

@@ -75,7 +75,7 @@ let repl () =
 let run path argv =
     try
         let m = Mana()
-        m.set ("argv", argv |> List.map Value.Str |> Value.List)
+        m.setValue ("argv", argv |> List.map Value.Str |> Value.List)
 
         let code = File.ReadAllText path
 

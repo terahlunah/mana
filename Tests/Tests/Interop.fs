@@ -72,7 +72,7 @@ let fromNative =
 
             let m = Mana()
 
-            m.set ("f", m.toValue nativeFunction)
+            m.setValue ("f", m.toValue nativeFunction)
             let result = m.run "f 4 \"hello\""
 
             let got = Value.repr result
@@ -83,7 +83,7 @@ let fromNative =
         }
     ]
 
-let fromRune =
+let toNative =
 
     let inline (==) o expected = mana2fsharp o expected
 
@@ -121,4 +121,4 @@ let fromRune =
         }
     ]
 
-let interopTests = testGroup "interop" [ fromNative; fromRune ]
+let interopTests = testGroup "interop" [ fromNative; toNative ]

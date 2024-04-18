@@ -217,11 +217,12 @@ module Test =
         let failedCount = TestResult.failedCount results
         let totalCount = TestResult.totalCount results
 
-        printfn "========== Failures =========="
+        if failedCount <> 0 then
+            printfn "========== Failures =========="
 
-        match results with
-        | TestResult.Group(_, tests) -> tests |> List.iter (reportFailures "")
-        | _ -> failwith "unreachable"
+            match results with
+            | TestResult.Group(_, tests) -> tests |> List.iter (reportFailures "")
+            | _ -> failwith "unreachable"
 
         printfn "========== Summary ==========="
         colored ConsoleColor.DarkGray { printfn $"Ignored : {ignoredCount}" }

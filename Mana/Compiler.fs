@@ -2,6 +2,7 @@ module Mana.Compiler
 
 open Mana
 open Mana.Error
+open Microsoft.FSharp.Core
 
 type Callable = Env<Value> -> Value
 let rec compileUnit = fun env -> Value.Nil
@@ -39,12 +40,24 @@ and compileClosure (paramNames: string list) body : Callable =
 
     fun _ -> closure
 
-and compileList exprs : Callable =
-    let exprs = compileExprs exprs
+and compileList items : Callable =
+    let items =
+        items
+        |> List.map (
+            function
+            | Elem e -> compileExpr e |> Elem
+            | Splat splat -> compileExpr splat |> Splat
+        )
 
     fun env ->
-        let eval e = e env
-        exprs |> List.map eval |> Value.List
+        items |> List.collect
+            (function
+            | Elem e -> e env |> List.singleton
+            | Splat splat ->
+                match splat env with
+                | List l -> l
+                | _ -> raiseError ManaError.OnlyListsCanBeSplatted
+            ) |> Value.List
 
 and compileTable items : Callable =
 
@@ -65,6 +78,18 @@ and compileBlock body : Callable =
         |> List.tryLast
         |> Option.defaultValue Value.Nil
 
+and compileAssign (symbol: string) (value: Ast): Callable =
+    let value = compileExpr value
+
+    fun env ->
+        let v = value env
+        
+        if env.assign(symbol, v) then
+            Value.Nil
+        else
+            raiseError (ManaError.SymbolNotFound symbol)
+
+
 and compileLet (p: Pattern) (value: Ast): Callable =
     let value = compileExpr value
 
@@ -83,8 +108,9 @@ and compileMatch (value: Ast) (cases: MatchCase list) : Callable =
     let value = compileExpr value
     
     let patterns = cases |> List.map _.pattern
+    let conds = cases |> List.map _.guard |> List.map (Option.map compileExpr)
     let bodies = cases |> List.map _.body |> compileExprs
-    let cases = List.zip patterns bodies
+    let cases = List.zip3 patterns conds bodies
     
     fun env ->
         let v = value env
@@ -92,10 +118,16 @@ and compileMatch (value: Ast) (cases: MatchCase list) : Callable =
         let rec runMatch cases =
             match cases with
             | [] -> raiseError (ManaError.PatternMatchingFailed)
-            | (pattern, body)::tail ->
+            | (pattern, guard, body)::tail ->
                 let caseEnv = env.localScope ()
                 if bindPattern caseEnv v pattern then
-                    body caseEnv
+                    let guardOk = guard |> Option.map (fun g -> g caseEnv |> Value.isTrue) |> Option.defaultValue true
+                        
+                    if guardOk then
+                        env.merge caseEnv
+                        body env
+                    else
+                        runMatch tail
                 else
                     runMatch tail
         
@@ -146,9 +178,10 @@ and compileExpr (expr: Ast) : Callable =
     | Ast.Str s -> fun env -> s |> Value.Str
     | Ast.Call(name, args) -> compileCall name args
     | Ast.Closure(args, body) -> compileClosure args body
-    | Ast.List exprs -> compileList exprs
+    | Ast.List items -> compileList items
     | Ast.Table pairs -> compileTable pairs
     | Ast.Block body -> compileBlock body
+    | Ast.Assign(symbol, value) -> compileAssign symbol value
     | Ast.Let(pattern, value) -> compileLet pattern value
     | Ast.Match(value, cases) -> compileMatch value cases
 

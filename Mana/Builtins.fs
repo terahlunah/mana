@@ -118,7 +118,9 @@ let condIfElse env args =
 
 let condWhen env args =
     match args with
-    | [ cond; Closure body ] -> if Value.isTrue cond then body env [] else Value.Nil
+    | [ cond; Closure body ] ->
+        if Value.isTrue cond then body env [] |> ignore else ()
+        Value.Nil
     | _ -> raiseError (ManaError.InvalidArguments "invalid `when` arguments")
 
 // Seq
@@ -164,7 +166,7 @@ let rev env args =
     | [ _ ] -> raiseError (ManaError.InvalidArguments $"`rev` argument must be a list or a string")
     | _ -> raiseError (ManaError.InvalidArguments "`rev` takes 1 argument")
 
-let nth env args =
+let get env args =
     match args with
     | [ Value.List x; Value.Num n ] ->
         let n = if n < 0 then x.Length - (int n) else (int n)
@@ -175,10 +177,74 @@ let nth env args =
         Seq.tryItem (int n) x
         |> Option.map (string >> Value.Str)
         |> Option.defaultValue Value.Nil
-    | [ _; Value.Num _ ] -> raiseError (ManaError.InvalidArguments $"`nth` first argument must be a list or a string")
+    | [ Value.Table x; key ] -> Map.tryFind key x |> Option.defaultValue Value.Nil
+    | [ _; Value.Num _ ] ->
+        raiseError (ManaError.InvalidArguments $"`get` first argument must be a list or a string when second is Num")
     | [ Value.Str _ | Value.List _; _ ] ->
-        raiseError (ManaError.InvalidArguments $"`nth` second argument must be a number")
-    | _ -> raiseError (ManaError.InvalidArguments "`nth` takes 2 arguments")
+        raiseError (ManaError.InvalidArguments $"`get` second argument must be a Num, when first is List or Str")
+    | _ -> raiseError (ManaError.InvalidArguments "`get` takes 2 arguments")
+
+let set env args =
+    match args with
+    | [ Value.List x; Value.Num index; value ] ->
+        let n = if index < 0 then x.Length - (int index) else (int index)
+
+        if n >= 0 && n < x.Length then
+            x
+            |> List.mapi (fun i v -> if i = n then value else v)
+            |> Value.List
+        else
+            raiseError (ManaError.InvalidArguments "Index out of bounds")
+    | [ Value.Table x; key; value ] -> Map.add key value x |> Value.Table
+    | [ _; Value.Num _ ] ->
+        raiseError (ManaError.InvalidArguments $"`set` first argument must be a list when second is Num")
+    | [ Value.List _; _ ] ->
+        raiseError (ManaError.InvalidArguments $"`set` second argument must be a Num when first is List")
+    | _ -> raiseError (ManaError.InvalidArguments "`set` takes 2 arguments")
+
+// Predicates
+
+let isNil env args =
+    match args with
+    | [ Nil ] -> Bool true
+    | [ _ ] -> Bool false
+    | _ -> raiseError (ManaError.InvalidArguments "`nil?` only takes 1 argument")
+
+let isBool env args =
+    match args with
+    | [ Bool _ ] -> Bool true
+    | [ _ ] -> Bool false
+    | _ -> raiseError (ManaError.InvalidArguments "`bool?` only takes 1 argument")
+
+let isNum env args =
+    match args with
+    | [ Num _ ] -> Bool true
+    | [ _ ] -> Bool false
+    | _ -> raiseError (ManaError.InvalidArguments "`num?` only takes 1 argument")
+
+let isStr env args =
+    match args with
+    | [ Str _ ] -> Bool true
+    | [ _ ] -> Bool false
+    | _ -> raiseError (ManaError.InvalidArguments "`str?` only takes 1 argument")
+
+let isList env args =
+    match args with
+    | [ List _ ] -> Bool true
+    | [ _ ] -> Bool false
+    | _ -> raiseError (ManaError.InvalidArguments "`list?` only takes 1 argument")
+
+let isTable env args =
+    match args with
+    | [ Table _ ] -> Bool true
+    | [ _ ] -> Bool false
+    | _ -> raiseError (ManaError.InvalidArguments "`table?` only takes 1 argument")
+
+let isFn env args =
+    match args with
+    | [ Closure _ ] -> Bool true
+    | [ _ ] -> Bool false
+    | _ -> raiseError (ManaError.InvalidArguments "`fn?` only takes 1 argument")
 
 let env: Env<Value> =
     Env.empty ()
@@ -218,4 +284,14 @@ let env: Env<Value> =
     |> Env.set "tail" (Value.Closure tail)
     |> Env.set "len" (Value.Closure len)
     |> Env.set "rev" (Value.Closure rev)
-    |> Env.set "nth" (Value.Closure nth)
+    |> Env.set "get" (Value.Closure get)
+    |> Env.set "set" (Value.Closure set)
+
+    // Predicates
+    |> Env.set "nil?" (Value.Closure isNil)
+    |> Env.set "bool?" (Value.Closure isBool)
+    |> Env.set "num?" (Value.Closure isNum)
+    |> Env.set "str?" (Value.Closure isStr)
+    |> Env.set "list?" (Value.Closure isList)
+    |> Env.set "table?" (Value.Closure isTable)
+    |> Env.set "fn?" (Value.Closure isFn)

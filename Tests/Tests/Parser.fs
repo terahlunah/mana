@@ -31,8 +31,11 @@ let primitives =
         test "number" { "3.14" == Ast.Num 3.14 }
         test "string" { "\"a\"" == Ast.Str "a" }
         test "list 0" { "[]" == Ast.List [] }
-        test "list 1" { "[1]" == Ast.List [ Ast.Num 1 ] }
-        test "list 2" { "[1, 2]" == Ast.List [ Ast.Num 1; Ast.Num 2 ] }
+        test "list 1" { "[1]" == Ast.List [ Ast.Num 1 |> Elem ] }
+        test "list 2" {
+            "[1, 2]"
+            == Ast.List [ Ast.Num 1 |> Elem; Ast.Num 2 |> Elem ]
+        }
         test "table" {
             "#[\"foo\": \"bar\"]"
             == Ast.Table [ (Ast.Str "foo", Ast.Str "bar") ]
@@ -152,8 +155,8 @@ let operators =
             == Ast.Call(
                 "map",
                 [
-                    Ast.List[Ast.Num 1
-                             Ast.Num 2]
+                    Ast.List[Ast.Num 1 |> Elem
+                             Ast.Num 2 |> Elem]
                     Ast.Closure([ "it" ], Ast.Block[Ast.Call("__add", [ Ast.Call("it", []); Ast.Num 1.0 ])])
 
                 ]
@@ -168,8 +171,8 @@ let operators =
                     Ast.Call(
                         "map",
                         [
-                            Ast.List[Ast.Num 1
-                                     Ast.Num 2]
+                            Ast.List[Ast.Num 1 |> Elem
+                                     Ast.Num 2 |> Elem]
                             Ast.Closure([ "it" ], Ast.Block[Ast.Call("it", [])])
                         ]
                     )
@@ -193,10 +196,12 @@ let bindings =
                     [
                         {
                             pattern = Pattern.Num 0
+                            guard = None
                             body = Ast.Bool true
                         }
                         {
                             pattern = Pattern.Wildcard
+                            guard = None
                             body = Ast.Bool false
                         }
                     ]
@@ -209,10 +214,12 @@ let bindings =
                     [
                         {
                             pattern = Pattern.List []
+                            guard = None
                             body = Ast.Block [ Ast.Bool true ]
                         }
                         {
                             pattern = Pattern.List [ ListPatternItem.Single(Pattern.Num 0) ]
+                            guard = None
                             body = Ast.Block [ Ast.Bool false ]
                         }
                     ]
@@ -228,7 +235,7 @@ let bindings =
             test "string" { "let \"a\" = nil" == Ast.Let(Pattern.Str "a", Ast.Nil) }
             test "symbol" {
                 "let x = [2]"
-                == Ast.Let(Pattern.Symbol "x", Ast.List [ Ast.Num 2 ])
+                == Ast.Let(Pattern.Symbol "x", Ast.List [ Ast.Num 2 |> Elem ])
             }
             test "list 0" { "let [] = nil" == Ast.Let(Pattern.List [], Ast.Nil) }
             test "list 1" {
@@ -237,7 +244,7 @@ let bindings =
             }
             test "list symbol" {
                 "let [a] = [1]"
-                == Ast.Let(Pattern.List [ ListPatternItem.Single(Pattern.Symbol "a") ], Ast.List [ Ast.Num 1 ])
+                == Ast.Let(Pattern.List [ ListPatternItem.Single(Pattern.Symbol "a") ], Ast.List [ Ast.Num 1 |> Elem ])
             }
         ]
     ]

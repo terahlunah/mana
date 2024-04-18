@@ -9,6 +9,8 @@ type Lexer(source: string) =
     let mutable currentPos: int = 0
     let mutable tokens: Token list = []
 
+    let isDigit (c: char) : bool = '0' <= c && c <= '9'
+
     let isSymbolHead (c: char) : bool =
         ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c = '_'
 
@@ -192,7 +194,7 @@ type Lexer(source: string) =
 
     member this.tryReadDigit() : Option<char> =
         match this.current () with
-        | Some c when '0' <= c && c <= '9' ->
+        | Some c when isDigit c ->
             this.advance ()
             Some c
         | _ -> None
@@ -222,7 +224,13 @@ type Lexer(source: string) =
 
         let mutable num = num
 
-        if this.tryReadExact '.' then
+        if
+            this.current () = Some '.'
+            && (this.peek ()
+                |> Option.map isDigit
+                |> Option.defaultValue false)
+        then
+            this.readExact '.'
             let fract = this.readInt ()
             num <- $"%s{num}.%s{fract}"
 
@@ -237,7 +245,7 @@ type Lexer(source: string) =
     member this.readStr() =
         let mutable s = ""
 
-        do this.readExact '"'
+        this.readExact '"'
 
         let rec loop () =
             let c = this.read ()
@@ -268,9 +276,9 @@ type Lexer(source: string) =
         | "=" -> this.token TokenKind.Eq
         | "|" -> this.token TokenKind.Pipe
         | ":" -> this.token TokenKind.Colon
-        | "->" -> this.token TokenKind.Arrow
+        | "->" -> this.token TokenKind.RightArrow
         | "." -> this.token TokenKind.Dot
-        | ".." -> this.token TokenKind.Rest
+        | ".." -> this.token TokenKind.DoubleDot
         | _ -> this.token TokenKind.Operator |> Token.withStr op
         |> this.emit
 

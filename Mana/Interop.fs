@@ -75,9 +75,9 @@ and (|FSharpFunction|_|) (env: Env<Value>) (obj: obj) =
     if not <| FSharpType.IsFunction t then
         None
     else
-        Some <| fromNativeFunction env "<native>" obj
+        Some <| fromNativeFunction env obj
 
-and fromNativeFunction (env: Env<Value>) (name: string) (obj: obj) =
+and fromNativeFunction (env: Env<Value>) (obj: obj) =
     let t = obj.GetType()
 
     let nativeName = t.Name.Split("@")[0]
@@ -112,6 +112,54 @@ and fromNativeFunction (env: Env<Value>) (name: string) (obj: obj) =
 
     fn
 
+and (|CSharpFunction|_|) (env: Env<Value>) (obj: obj) =
+    let t = obj.GetType()
+
+    if CSharpType.isFunction t then
+        Some <| fromNativeFunc env obj
+    else
+        None
+
+and fromNativeFunc (env: Env<Value>) (obj: obj) =
+    let t = obj.GetType()
+
+    let nativeName = t.Name.Split("@")[0]
+
+    let inputs =
+        if CSharpType.isAction t then
+            t.GetGenericArguments() |> List.ofSeq
+        else
+            t.GetGenericArguments()
+            |> List.ofSeq
+            |> List.rev
+            |> List.tail
+            |> List.rev
+
+    let rec typeCheck (env: Env<Value>) (values: Value list) (types: Type list) : obj list =
+        match types with
+        | [] ->
+            if values.Length > 0 then
+                failwith $"Too many arguments for function `${nativeName}`"
+            else
+                []
+        | t :: restTypes when t = typeof<Env<Value>> -> box env :: typeCheck env values restTypes
+        | t :: restTypes ->
+            match values with
+            | [] -> failwith $"Not enough arguments for function `${nativeName}`"
+            | v :: restValues ->
+                (fromValueBoxed env t v)
+                :: (typeCheck env restValues restTypes)
+
+    let fn (env: Env<Value>) (values: Value list) : Value =
+
+        let checkedValues = typeCheck env values inputs |> Seq.toArray
+
+        let ret = (obj :?> Delegate).DynamicInvoke(checkedValues)
+
+        fromNative env ret
+
+    fn
+
 and fromNative (env: Env<Value>) (obj: obj) : Value =
     match obj with
     | :? Value -> obj :?> Value
@@ -126,6 +174,7 @@ and fromNative (env: Env<Value>) (obj: obj) : Value =
     | FSharpUnion caseName -> Value.Str caseName
     | FSharpSome env value -> value
     | FSharpFunction env fn -> Value.Closure(fn)
+    | CSharpFunction env fn -> Value.Closure(fn)
     | _ -> Value.Nil
 
 and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =

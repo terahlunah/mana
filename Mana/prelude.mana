@@ -1,3 +1,11 @@
+; Core
+
+let with = { |x, f|
+    match x
+    | nil -> nil
+    | _ -> f x
+}
+
 
 ; Seq
 

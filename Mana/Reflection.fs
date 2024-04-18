@@ -4,6 +4,39 @@ open System
 open System.Reflection
 open Microsoft.FSharp.Reflection
 
+module CSharpType =
+    
+    let isAction (typ: Type) =
+        let actionTypes =
+            typeof<Action> ::
+            ([
+                
+                typeof<Action<_>>
+                typeof<Action<_, _>>
+                typeof<Action<_, _, _>>
+                typeof<Action<_, _, _, _>>
+                typeof<Action<_, _, _, _, _>>
+            ] |> List.map _.GetGenericTypeDefinition())
+    
+        typ.IsGenericType && List.exists ((=) (typ.GetGenericTypeDefinition())) actionTypes
+    
+    let isFunc (typ: Type) =
+        let funcTypes =
+            [
+                typeof<Func<_>>
+                typeof<Func<_, _>>
+                typeof<Func<_, _, _>>
+                typeof<Func<_, _, _, _>>
+                typeof<Func<_, _, _, _, _>>
+                typeof<Func<_, _, _, _, _, _>>
+            ] |> List.map _.GetGenericTypeDefinition()
+
+        
+        typ.IsGenericType && List.exists ((=) (typ.GetGenericTypeDefinition())) funcTypes
+    let isFunction (typ: Type) =
+        isFunc typ || isAction typ
+       
+
 module FSharpType =
     let isOption (typ: Type) =
         typ.IsGenericType
