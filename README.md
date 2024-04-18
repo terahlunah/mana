@@ -31,7 +31,9 @@ Hence, the language design is trying to balance the following properties:
   - [x] List destructuring
   - [ ] Table destructuring
 - [x] Builtin core functions
+  - [ ] for/range loop construct
   - [ ] Documentation
+- [ ] Early return / Loop break
 - [ ] Imports
 - [ ] Error reporting
 - [ ] Reference values
