@@ -8,17 +8,19 @@ Mana has been created to serve as the scripting language for my private generati
 Hence, the language design is trying to balance the following properties:
 
 - ### Minimalist
-  - Simple to parse and run.
-  - Contain the minimum it needs to be useful and delegate as needed to the host.
-  - Light and consistent syntax.
+  - Should be simple to parse and to run.
+  - Should contain the minimum needed to be work and delegate the rest to the host.
+  - Syntax should be lightweight and consistent.
 - ### Expressive
   - Primitives should be powerful enough to support most use cases out of the box.
-  - Changing behavior should only need minimal code changes.
+  - Changing behavior should only require minimal code changes.
 - ### Intuitive
-  - Try to use well known syntax.
+  - Should use common syntax.
   - Core functions should behave as you'd expect.
 
 #### These properties aim to create a tight feedback loop so one can focus on the art and not the script.
+
+TODO: Examples
 
 # Features
 
