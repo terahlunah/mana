@@ -5,51 +5,6 @@ open PrettyPrompt.Highlighting
 open Mana
 open System.IO
 
-open CommandLine
-open CommandLine.Text
-
-type CliArgs = {
-    [<Option('f', "format", HelpText = "Format a file.")>]
-    format: bool
-    [<Option('i', "format-stdin", HelpText = "Format stdin input.")>]
-    stdin: bool
-    [<Value(0, MetaName = "file", HelpText = "A file to run or format.")>]
-    file: string option
-} with
-
-    [<Usage>]
-    static member examples = seq {
-        yield
-            Example(
-                "Start the repl",
-                {
-                    format = false
-                    stdin = false
-                    file = None
-                }
-            )
-
-        yield
-            Example(
-                "Run a file",
-                {
-                    format = false
-                    stdin = false
-                    file = "test.mana" |> Some
-                }
-            )
-
-        yield
-            Example(
-                "Format a file",
-                {
-                    format = true
-                    stdin = false
-                    file = "test.mana" |> Some
-                }
-            )
-    }
-
 let repl () =
     let config = PromptConfiguration(prompt = FormattedString("mana> "))
     let prompt = Prompt(configuration = config)
@@ -72,10 +27,10 @@ let repl () =
 
     loop ()
 
-let run path argv =
+let run path args =
     try
         let m = Mana()
-        m.setValue ("argv", argv |> List.map Value.Str |> Value.List)
+        m.setValue ("args", args |> List.map Value.Str |> Value.List)
 
         let code = File.ReadAllText path
 
@@ -83,25 +38,10 @@ let run path argv =
 
         printfn $"%s{output}"
 
-        0
     with :? ManaException as e ->
         printfn $"Error: {e.error}"
-        1
-
-let format source =
-    // Formatter.format source |> display
-    0
-
-let inline (|Success|Help|Version|Fail|) (result: ParserResult<'a>) =
-    match result with
-    | :? Parsed<'a> as parsed -> Success(parsed.Value)
-    | :? NotParsed<'a> as notParsed when notParsed.Errors.IsHelp() -> Help
-    | :? NotParsed<'a> as notParsed when notParsed.Errors.IsVersion() -> Version
-    | :? NotParsed<'a> as notParsed -> Fail(notParsed.Errors)
-    | _ -> failwith "invalid parser result"
 
 let args = Environment.GetCommandLineArgs() |> Array.skip 1
-let result = Parser.Default.ParseArguments<CliArgs>(args)
 
 let readAllStdInText () =
     let rec readAllStdIn (lines: string list) =
@@ -113,21 +53,6 @@ let readAllStdInText () =
 
     readAllStdIn []
 
-match result with
-| Success(opts) ->
-    if opts.stdin then
-        let source = readAllStdInText ()
-        source |> format |> exit
-    elif opts.format then
-        match opts.file with
-        | Some file -> file |> File.ReadAllText |> format |> exit
-        | None -> exit 1
-    else
-        match opts.file with
-        | None ->
-            repl ()
-            exit 0
-        | Some file -> run file [] |> exit
-| Fail _ -> exit 1
-| Help
-| Version -> exit 0
+match Seq.toList args with
+| [] -> repl ()
+| file :: args -> run file args

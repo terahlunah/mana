@@ -121,6 +121,7 @@ let calls =
             == Ast.Call("f", [ Ast.Num 1; Ast.Num 2; Ast.Num 3 ])
         }
         test "f g" { "f g" == Ast.Call("f", [ Ast.Call("g", []) ]) }
+        test "f (g 0)" { "f (g 0)" == Ast.Call("f", [ Ast.Call("g", [ Ast.Num 0 ]) ]) }
     ]
 
 let operators =

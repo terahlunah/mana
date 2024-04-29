@@ -4,6 +4,24 @@ open Mana
 open Mana.Error
 open System
 
+// Meta
+
+let __env (env: Env<Value>) args =
+    let bindings =
+        env.getAll ()
+        |> Seq.map (fun kv -> (Value.Str kv.Key, kv.Value))
+        |> Map.ofSeq
+        |> Value.Table
+
+    [
+        (Value.Str "name", Value.Str env.name)
+        (Value.Str "bindings", bindings)
+    ]
+    |> Map.ofList
+    |> Value.Table
+
+let __env_name (env: Env<Value>) args = env.name |> Value.Str
+
 // Arithmetic
 let neg env args =
     match args with
@@ -202,6 +220,13 @@ let set env args =
         raiseError (ManaError.InvalidArguments $"`set` second argument must be a Num when first is List")
     | _ -> raiseError (ManaError.InvalidArguments "`set` takes 2 arguments")
 
+let contains env args =
+    match args with
+    | [ Value.List l; x ] -> l |> List.contains x |> Value.Bool
+    | [ Value.Str s; Value.Str x ] -> s.Contains x |> Value.Bool
+    | [ Value.Table t; key ] -> t |> Map.containsKey key |> Value.Bool
+    | _ -> raiseError (ManaError.InvalidArguments "invalid arguments for `contains`")
+
 // Predicates
 
 let isNil env args =
@@ -246,8 +271,21 @@ let isFn env args =
     | [ _ ] -> Bool false
     | _ -> raiseError (ManaError.InvalidArguments "`fn?` only takes 1 argument")
 
+// Conversions
+
+let toNum env args =
+    match args with
+    | [ Str s ] -> Num(float s)
+    | [ Num n ] -> Num n
+    | [ Bool b ] -> (if b then 1.0 else 0.0) |> Num
+    | _ -> raiseError (ManaError.InvalidArguments "`fn?` only takes 1 argument")
+
 let env: Env<Value> =
-    Env.empty ()
+    Env.empty ("builtins")
+
+    // Meta
+    |> Env.set "__env" (Value.Closure __env)
+
     // Arithmetic
     |> Env.set "pi" (Value.Num Math.PI)
     |> Env.set "__add" (Value.Closure add)
@@ -286,6 +324,7 @@ let env: Env<Value> =
     |> Env.set "rev" (Value.Closure rev)
     |> Env.set "get" (Value.Closure get)
     |> Env.set "set" (Value.Closure set)
+    |> Env.set "contains" (Value.Closure contains)
 
     // Predicates
     |> Env.set "nil?" (Value.Closure isNil)
@@ -295,3 +334,6 @@ let env: Env<Value> =
     |> Env.set "list?" (Value.Closure isList)
     |> Env.set "table?" (Value.Closure isTable)
     |> Env.set "fn?" (Value.Closure isFn)
+
+    // Conversions
+    |> Env.set "num" (Value.Closure toNum)

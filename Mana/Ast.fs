@@ -31,6 +31,10 @@ module Ast =
         | head :: tail ->
             let useIt =
                 match head with
+                | Nil
+                | Bool _
+                | Num _
+                | Str _ -> false
                 | Ast.List items ->
                     items
                     |> List.map (
@@ -50,7 +54,20 @@ module Ast =
                     useImplicitIt [ body ]
                     && args <> List.empty
                     && not (args |> Seq.exists ((=) "it"))
-                | _ -> false
+                | Block body -> useImplicitIt body
+                | Assign(_, value) -> useImplicitIt [ value ]
+                | Match(expr, cases) ->
+                    useImplicitIt [ expr ]
+                    || Seq.exists
+                        (fun case ->
+                            useImplicitIt (
+                                case.body
+                                :: (case.guard
+                                    |> Option.map List.singleton
+                                    |> Option.defaultValue [])
+                            )
+                        )
+                        cases
 
             useIt || useImplicitIt tail
 

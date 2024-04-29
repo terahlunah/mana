@@ -23,22 +23,20 @@ and compileCall name args : Callable =
 and compileClosure (paramNames: string list) body : Callable =
     let body = compileExpr body
 
-    let closure =
-        fun (env: Env<Value>) (args: Value list) ->
+    fun (env: Env<Value>) ->
+        fun _ (args: Value list) ->
             // Check arity
             if paramNames.Length <> args.Length then
                 raiseError (ManaError.InvalidArgumentCount("closure", args.Length, paramNames.Length))
 
             // Prepare env with args
-            let scope = env.localScope ()
+            let scope = env.localScope ($"""closure |{paramNames |> String.concat ","}|""")
 
             for k, v in List.zip paramNames args do
                 scope.set (k, v)
 
             body scope
         |> Value.Closure
-
-    fun _ -> closure
 
 and compileList items : Callable =
     let items =
@@ -84,7 +82,7 @@ and compileAssign (symbol: string) (value: Ast): Callable =
     fun env ->
         let v = value env
         
-        if env.assign(symbol, v) then
+        if env.globalAssign(symbol, v) then
             Value.Nil
         else
             raiseError (ManaError.SymbolNotFound symbol)
@@ -96,7 +94,7 @@ and compileLet (p: Pattern) (value: Ast): Callable =
     fun env ->
         let v = value env
 
-        let letEnv = env.localScope ()
+        let letEnv = env.localScope ($"let |%A{p}|")
 
         if bindPattern letEnv v p then
             env.merge letEnv
@@ -119,7 +117,7 @@ and compileMatch (value: Ast) (cases: MatchCase list) : Callable =
             match cases with
             | [] -> raiseError (ManaError.PatternMatchingFailed)
             | (pattern, guard, body)::tail ->
-                let caseEnv = env.localScope ()
+                let caseEnv = env.localScope ($"match case |%A{pattern}|")
                 if bindPattern caseEnv v pattern then
                     let guardOk = guard |> Option.map (fun g -> g caseEnv |> Value.isTrue) |> Option.defaultValue true
                         

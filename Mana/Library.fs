@@ -6,12 +6,12 @@ open Mana.Error
 open Mana.Interop
 
 type Mana() as this =
-    let mutable globalEnv: Env<Value> = Env.empty ()
+    let mutable globalEnv: Env<Value> = Env.empty ("global")
 
     do this.loadPrelude ()
 
     member this.loadPrelude() =
-        globalEnv <- Env.merge globalEnv Builtins.env
+        globalEnv.merge Builtins.env
 
         let prelude = this.loadResource "prelude"
         this.run prelude |> ignore
@@ -47,7 +47,7 @@ type Mana() as this =
         runScript globalEnv
 
     member this.call(fname, args: Value seq) : Value =
-        let env = globalEnv.localScope ()
+        let env = globalEnv.localScope ("host call")
 
         match env.get fname with
         | Some(Value.Closure(handler)) -> handler env (args |> Seq.toList)

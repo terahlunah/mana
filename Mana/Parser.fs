@@ -401,7 +401,7 @@ type Parser(tokens: Token list) =
                         TokenKind.RParen,
                         (fun _ ->
                             this.skipAll TokenKind.NewLine
-                            let e = this.parseExpr (0, true)
+                            let e = this.parseExpr (0, false)
                             this.skipAll TokenKind.NewLine
                             e
                         )

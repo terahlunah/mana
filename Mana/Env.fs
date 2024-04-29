@@ -3,16 +3,18 @@
 open System.Collections.Generic
 
 type Env<'T> = {
+    name: string
     mutable bindings: Dictionary<string, 'T>
     mutable parent: Env<'T> option
 } with
 
-    static member empty<'T>() : Env<'T> = {
+    static member empty<'T>(name) : Env<'T> = {
+        name = name
         bindings = Dictionary<string, 'T>()
         parent = None
     }
 
-    member self.localScope() = { Env<'T>.empty () with parent = Some self }
+    member self.localScope(name) = { Env<'T>.empty (name) with parent = Some self }
     member self.set(k, v) = self.bindings.[k] <- v
     
     member self.assign(k, v) =
@@ -46,9 +48,22 @@ type Env<'T> = {
 
         result
 
-    member this.merge other =
+    member this.merge(other) =
         for KeyValue(k, v) in other.bindings do
             this.bindings.[k] <- v
+            
+    member this.getAll():Dictionary<string, 'T> =
+        
+        match this.parent with
+        | Some parent ->
+            let newBindings = Dictionary<string, 'T>(parent.getAll())
+            for KeyValue(k, v) in this.bindings do
+                newBindings.[k] <- v
+            newBindings
+        | None -> Dictionary<string, 'T>(this.bindings)
+        
+    member this.scopes() =
+        this.name :: (this.parent |> Option.map _.scopes() |> Option.defaultValue [])
 
 module Env =
     let merge e1 e2 =
@@ -58,6 +73,7 @@ module Env =
             newBindings.[k] <- v
 
         {
+            name = e1.name
             bindings = newBindings
             parent = None
         }
