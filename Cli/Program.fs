@@ -4,6 +4,7 @@ open PrettyPrompt
 open PrettyPrompt.Highlighting
 open Mana
 open System.IO
+open Newtonsoft.Json
 
 let repl () =
     let config = PromptConfiguration(prompt = FormattedString("mana> "))
@@ -30,7 +31,9 @@ let repl () =
 let run path args =
     try
         let m = Mana()
-        m.setValue ("args", args |> List.map Value.Str |> Value.List)
+        // m.setValue ("args", args |> List.map Value.Str |> Value.List)
+        let n = args |> List.head |> float |> Value.Num
+        m.setValue ("n", n)
 
         let code = File.ReadAllText path
 
@@ -38,6 +41,20 @@ let run path args =
 
         printfn $"%s{output}"
 
+    with :? ManaException as e ->
+        printfn $"Error: {e.error}"
+
+let dumpIR path args =
+    try
+        let m = Mana()
+
+        let code = File.ReadAllText path
+        let ir = m.parse code
+
+        let json = JsonConvert.SerializeObject(ir, Formatting.Indented)
+
+        let output = Path.ChangeExtension(path, ".mir")
+        File.WriteAllText(output, json)
     with :? ManaException as e ->
         printfn $"Error: {e.error}"
 

@@ -37,10 +37,17 @@ type Mana() as this =
         let v = this.toValue value
         this.setValue (name, v)
 
+    member this.parse(code: string) : Ast =
+        let tokens = code |> Lexer.lex
+        let ast = tokens |> Parser.parseMany
+        ast
+
     member this.run(code: string) : Value =
         let tokens = code |> Lexer.lex
-
         let ast = tokens |> Parser.parseMany
+
+        // let d = sprintf $"%A{ast}"
+        // printfn "%s" (d.Replace("\n", "\r\n"))
 
         let runScript = Compiler.compileExpr ast
 

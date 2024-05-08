@@ -30,23 +30,17 @@ type Env<'T> = {
             true
         else
             self.parent |> Option.map (_.globalAssign(k,v)) |> Option.defaultValue false
-
+            
     member self.get k =
-        let mutable env = self
-        let mutable brk = false
-        let mutable result = None
+        let rec loop e =
+            match e.bindings.TryGetValue(k) with
+            | true, v -> Some v
+            | false, _ -> 
+                match e.parent with
+                | Some p -> loop p
+                | _ -> None
 
-        while not brk do
-            match env.bindings.TryGetValue(k) with
-            | true, v ->
-                result <- Some v
-                brk <- true
-            | false, _ ->
-                match env.parent with
-                | Some p -> env <- p
-                | None -> brk <- true
-
-        result
+        loop self
 
     member this.merge(other) =
         for KeyValue(k, v) in other.bindings do

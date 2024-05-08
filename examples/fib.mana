@@ -1,26 +1,8 @@
-
-
-let memoize = { |f|
-    let cache = #[]
-    
-    { |x|
-        if (contains cache x) {
-            cache.get x
-        } {
-            let v = f x
-            cache = cache.set x v
-            v
-        }
-    }
-}
-
-
-let fib = memoize {
+let fib = {
     match it 
     | 0 -> 0
     | 1 -> 1
     | n -> (fib (n-1)) + (fib (n-2))
 }
 
-let n = args.head.num
 fib n

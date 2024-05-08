@@ -278,7 +278,7 @@ let toNum env args =
     | [ Str s ] -> Num(float s)
     | [ Num n ] -> Num n
     | [ Bool b ] -> (if b then 1.0 else 0.0) |> Num
-    | _ -> raiseError (ManaError.InvalidArguments "`fn?` only takes 1 argument")
+    | _ -> raiseError (ManaError.InvalidArguments "`num` only takes 1 argument")
 
 let env: Env<Value> =
     Env.empty ("builtins")
