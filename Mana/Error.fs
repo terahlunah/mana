@@ -21,6 +21,7 @@ type ManaError =
     | NotAFunction of value: string
     | LetBinding of string
     | PatternMatchingFailed
+    | ChannelCantBeUsedAsKey
     | ClosureCantBeUsedAsKey
     | MoreThanOneRestPattern
     | OnlyListsCanBeSplatted

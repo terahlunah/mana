@@ -2,6 +2,7 @@ namespace Mana
 
 open System
 open Mana.Error
+open Mana.Cont
 
 [<CustomComparison; CustomEquality>]
 type Value =
@@ -11,7 +12,8 @@ type Value =
     | Str of s: string
     | List of items: Value list
     | Table of items: Map<Value, Value>
-    | Closure of handler: (Env<Value> -> List<Value> -> Value)
+    | Closure of handler: (Context<Value> -> Env<Value> -> List<Value> -> (Value -> Value) -> Value)
+    | Channel of Channel<Value>
 
     [<CompiledName("AsBool")>]
     member this.asBool =
@@ -44,7 +46,10 @@ type Value =
         | _ -> failwith "Invalid Value access"
 
     static member NewFuncClosure(handler: System.Func<Env<Value>, ResizeArray<Value>, Value>) =
-        let h (env: Env<Value>) (args: List<Value>) = handler.Invoke(env, ResizeArray args)
+        let h (ctx: Context<Value>) (env: Env<Value>) (args: List<Value>) = cps {
+            return handler.Invoke(env, ResizeArray args)
+        }
+
         Value.Closure h
 
     member this.Rank() =
@@ -56,6 +61,7 @@ type Value =
         | List _ -> 4
         | Table _ -> 5
         | Closure _ -> 6
+        | Channel _ -> 7
 
     interface IEquatable<Value> with
         member this.Equals other =
@@ -64,9 +70,10 @@ type Value =
             | Bool a, Bool b -> a = b
             | Num a, Num b -> a = b
             | Str a, Str b -> a = b
-            | Closure _, Closure _ -> false
             | List a, List b -> a = b
             | Table a, Table b -> a = b
+            | Closure _, Closure _ -> false
+            | Channel _, Channel _ -> false
             | _ -> false
 
     override this.Equals other =
@@ -81,9 +88,10 @@ type Value =
             | Bool a, Bool b -> compare a b
             | Num a, Num b -> compare a b
             | Str a, Str b -> compare a b
-            | Closure _, Closure _ -> 0
             | List a, List b -> compare a b
             | Table a, Table b -> compare a b
+            | Closure _, Closure _ -> 0
+            | Channel _, Channel _ -> 0
             | _ -> compare (this.Rank()) (other.Rank())
 
     interface IComparable with
@@ -99,9 +107,10 @@ type Value =
         | Bool false -> 2
         | Num n -> hash n
         | Str s -> hash s
-        | Closure h -> raiseError ClosureCantBeUsedAsKey
         | List items -> hash items
         | Table items -> hash items
+        | Closure _ -> raiseError ClosureCantBeUsedAsKey
+        | Channel _ -> raiseError ChannelCantBeUsedAsKey
 
 module Value =
     let isTrue =
@@ -142,7 +151,8 @@ module Value =
         | Bool b -> $"%b{b}"
         | Num n -> $"%g{n}"
         | Str s -> $"\"%s{s}\""
-        | Closure _ -> $"<closure>"
+        | Closure _ -> "<closure>"
+        | Channel _ -> "<channel>"
         | List items ->
             items
             |> Seq.map repr

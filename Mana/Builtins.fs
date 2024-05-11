@@ -1,12 +1,13 @@
 module Mana.Builtins
 
 open Mana
+open Mana.Cont
 open Mana.Error
 open System
 
-// Meta
+// Env
 
-let __env (env: Env<Value>) args =
+let __env (env: Env<Value>) _ =
     let bindings =
         env.getAll ()
         |> Seq.map (fun kv -> (Value.Str kv.Key, kv.Value))
@@ -20,7 +21,75 @@ let __env (env: Env<Value>) args =
     |> Map.ofList
     |> Value.Table
 
-let __env_name (env: Env<Value>) args = env.name |> Value.Str
+let __env_name (env: Env<Value>) _ = env.name |> Value.Str
+
+// Coroutines and Channels
+
+let co_spawn (ctx: Context<Value>) env args = cps {
+    match args with
+    | [ Closure handler ] ->
+        let cont = cps {
+            // Discard coroutine return
+            let! _ = handler ctx env []
+            // We need to run the remaining coroutines after this one finishes
+            return ctx.RunNextCoroutine(fun _ -> Value.Nil)
+        }
+
+        ctx.ScheduleCoroutine(cont)
+        return Value.Nil
+    | _ -> return raiseError (ManaError.InvalidArguments "invalid `spawn` arguments")
+}
+
+let co_suspend (ctx: Context<Value>) env args (k: Value -> Value) =
+    match args with
+    | [] ->
+        let cont _ = k Value.Nil
+        ctx.ScheduleCoroutine(cont)
+        ctx.RunNextCoroutine(fun _ -> Value.Nil)
+    | _ -> raiseError (ManaError.InvalidArguments "invalid `suspend` arguments")
+
+let ch_close (ctx: Context<Value>) env args = cps {
+    match args with
+    | [ Channel c ] ->
+        ctx.CloseChannel c
+        return Value.Nil
+    | _ -> return raiseError (ManaError.InvalidArguments "invalid `close` arguments")
+}
+
+let ch_recv (ctx: Context<Value>) env args k =
+    match args with
+    | [ Channel c ] ->
+        match c.SendDequeue(), c.BufDequeue() with
+        | Some(s, sv), None ->
+            ctx.ScheduleCoroutine(cps { return s Value.Nil })
+            k sv
+        | Some(s, sv), Some v ->
+            c.BufEnqueue sv
+            ctx.ScheduleCoroutine(cps { return s Value.Nil })
+            k v
+        | None, None when c.CanRecv() ->
+            c.RecvEnqueue k
+            ctx.RunNextCoroutine(fun _ -> Value.Nil)
+        | None, None -> failwith "Channel receive queue is full"
+        | None, Some v -> k v
+    | _ -> raiseError (ManaError.InvalidArguments "invalid `recv` arguments")
+
+let ch_send (ctx: Context<Value>) env args k =
+    match args with
+    | [ Channel c; v ] ->
+        match c.RecvDequeue() with
+        | Some r ->
+            ctx.ScheduleCoroutine(cps { return r v })
+            k Value.Nil
+        | None when not (c.IsFull()) ->
+            c.BufEnqueue v
+            k Value.Nil
+        | None when c.CanSend() ->
+            c.SendEnqueue k v
+            ctx.RunNextCoroutine(fun _ -> Value.Nil)
+        | None -> failwith "Channel send queue is full"
+
+    | _ -> raiseError (ManaError.InvalidArguments "invalid `send` arguments")
 
 // Arithmetic
 let neg env args =
@@ -112,34 +181,48 @@ let debug env args =
     printfn $"%A{x}"
     Value.Nil
 
-let display env args =
+let print env args =
     let x = args |> List.map Value.repr |> String.concat ""
     printfn $"%s{x}"
     Value.Nil
 
-let rec cond env args =
-    match args with
-    | Closure condition :: Closure body :: rest ->
-        let c = condition env []
-        if Value.isTrue c then body env [] else cond env rest
-    | [] -> Value.Nil
-    | _ -> raiseError (ManaError.InvalidArguments "invalid `cond` arguments")
+let rec cond ctx env args = cps {
+    return!
+        match args with
+        | Closure condition :: Closure body :: rest -> cps {
+            let! c = condition ctx env []
 
-let condIfElse env args =
+            let! r =
+                if Value.isTrue c then
+                    body ctx env []
+                else
+                    cond ctx env rest
+
+            return r
+          }
+        | [] -> cps { return Value.Nil }
+        | _ -> cps { return raiseError (ManaError.InvalidArguments "invalid `cond` arguments") }
+}
+
+let condIfElse ctx env args = cps {
     match args with
     | [ cond; Closure thenBody; Closure elseBody ] ->
         if Value.isTrue cond then
-            thenBody env []
+            return! thenBody ctx env []
         else
-            elseBody env []
-    | _ -> raiseError (ManaError.InvalidArguments "invalid `if` arguments")
+            return! elseBody ctx env []
+    | _ -> return raiseError (ManaError.InvalidArguments "invalid `if` arguments")
+}
 
-let condWhen env args =
+let condWhen ctx env args = cps {
     match args with
     | [ cond; Closure body ] ->
-        if Value.isTrue cond then body env [] |> ignore else ()
-        Value.Nil
-    | _ -> raiseError (ManaError.InvalidArguments "invalid `when` arguments")
+        if Value.isTrue cond then
+            return! body ctx env []
+        else
+            return Value.Nil
+    | _ -> return raiseError (ManaError.InvalidArguments "invalid `when` arguments")
+}
 
 // Seq
 let concat env args =
@@ -280,60 +363,70 @@ let toNum env args =
     | [ Bool b ] -> (if b then 1.0 else 0.0) |> Num
     | _ -> raiseError (ManaError.InvalidArguments "`num` only takes 1 argument")
 
+let bind name f =
+    let kf = fun ctx env args k -> k (f env args)
+    Env.set name (Value.Closure(kf))
+
+let bindRaw name f = Env.set name (Value.Closure(f))
+
 let env: Env<Value> =
     Env.empty ("builtins")
 
     // Meta
-    |> Env.set "__env" (Value.Closure __env)
+    |> bind "__env" __env
+
+    // Corountines
+    |> bindRaw "spawn" co_spawn
+    |> bindRaw "suspend" co_suspend
 
     // Arithmetic
     |> Env.set "pi" (Value.Num Math.PI)
-    |> Env.set "__add" (Value.Closure add)
-    |> Env.set "__neg" (Value.Closure neg)
-    |> Env.set "__sub" (Value.Closure sub)
-    |> Env.set "__mul" (Value.Closure mul)
-    |> Env.set "__div" (Value.Closure div)
-    |> Env.set "__pow" (Value.Closure pow)
-    |> Env.set "__mod" (Value.Closure rem)
+    |> bind "__add" add
+    |> bind "__neg" neg
+    |> bind "__sub" sub
+    |> bind "__mul" mul
+    |> bind "__div" div
+    |> bind "__pow" pow
+    |> bind "__mod" rem
 
     // Logic
-    |> Env.set "__gt" (Value.Closure gt)
-    |> Env.set "__ge" (Value.Closure ge)
-    |> Env.set "__lt" (Value.Closure lt)
-    |> Env.set "__le" (Value.Closure le)
-    |> Env.set "__eq" (Value.Closure eq)
-    |> Env.set "__ne" (Value.Closure ne)
-    |> Env.set "__not" (Value.Closure bnot)
-    |> Env.set "__and" (Value.Closure band)
-    |> Env.set "__or" (Value.Closure bor)
+    |> bind "__gt" gt
+    |> bind "__ge" ge
+    |> bind "__lt" lt
+    |> bind "__le" le
+    |> bind "__eq" eq
+    |> bind "__ne" ne
+    |> bind "__not" bnot
+    |> bind "__and" band
+    |> bind "__or" bor
 
     // IO
-    |> Env.set "display" (Value.Closure display)
-    |> Env.set "debug" (Value.Closure debug)
+    |> bind "print" print
+    |> bind "debug" debug
 
     // Control Flow
-    |> Env.set "cond" (Value.Closure cond)
-    |> Env.set "if" (Value.Closure condIfElse)
-    |> Env.set "when" (Value.Closure condWhen)
+    |> bindRaw "cond" cond
+    |> bindRaw "if" condIfElse
+    |> bindRaw "when" condWhen
 
     // Seq
-    |> Env.set "concat" (Value.Closure concat)
-    |> Env.set "head" (Value.Closure head)
-    |> Env.set "tail" (Value.Closure tail)
-    |> Env.set "len" (Value.Closure len)
-    |> Env.set "rev" (Value.Closure rev)
-    |> Env.set "get" (Value.Closure get)
-    |> Env.set "set" (Value.Closure set)
-    |> Env.set "contains" (Value.Closure contains)
+    |> bind "concat" concat
+    |> bind "head" head
+    |> bind "tail" tail
+    |> bind "len" len
+    |> bind "rev" rev
+    |> bind "get" get
+    |> bind "set" set
+    |> bind "contains" contains
 
     // Predicates
-    |> Env.set "nil?" (Value.Closure isNil)
-    |> Env.set "bool?" (Value.Closure isBool)
-    |> Env.set "num?" (Value.Closure isNum)
-    |> Env.set "str?" (Value.Closure isStr)
-    |> Env.set "list?" (Value.Closure isList)
-    |> Env.set "table?" (Value.Closure isTable)
-    |> Env.set "fn?" (Value.Closure isFn)
+    |> bind "nil?" isNil
+    |> bind "bool?" isBool
+    |> bind "num?" isNum
+    |> bind "str?" isStr
+    |> bind "list?" isList
+    |> bind "table?" isTable
+    |> bind "fn?" isFn
 
     // Conversions
-    |> Env.set "num" (Value.Closure toNum)
+    |> bind "num" toNum

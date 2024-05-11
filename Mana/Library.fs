@@ -6,7 +6,8 @@ open Mana.Error
 open Mana.Interop
 
 type Mana() as this =
-    let mutable globalEnv: Env<Value> = Env.empty ("global")
+    let globalEnv: Env<Value> = Env.empty ("global")
+    let ctx = Context<Value>()
 
     do this.loadPrelude ()
 
@@ -49,17 +50,17 @@ type Mana() as this =
         // let d = sprintf $"%A{ast}"
         // printfn "%s" (d.Replace("\n", "\r\n"))
 
-        let runScript = Compiler.compileExpr ast
+        let runScript = Compiler.compile ast
 
-        runScript globalEnv
+        runScript ctx globalEnv
 
     member this.call(fname, args: Value seq) : Value =
         let env = globalEnv.localScope ("host call")
 
         match env.get fname with
-        | Some(Value.Closure(handler)) -> handler env (args |> Seq.toList)
+        | Some(Value.Closure(handler)) -> handler ctx env (args |> Seq.toList) id
         | Some _ -> raiseError <| ManaError.NotAFunction fname
         | _ -> raiseError <| ManaError.FunctionNotFound fname
 
-    member this.toValue<'T>(native: obj) : Value = fromNative globalEnv native
-    member this.fromValue<'T>(v: Value) : 'T = fromValue<'T> globalEnv v
+    member this.toValue<'T>(native: obj) : Value = fromNative ctx globalEnv native
+    member this.fromValue<'T>(v: Value) : 'T = fromValue<'T> ctx globalEnv v

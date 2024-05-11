@@ -7,29 +7,29 @@ open System.Reflection
 open Microsoft.FSharp.Reflection
 open Mana
 
-let rec (|FSharpList|_|) (env: Env<Value>) (obj: obj) =
+let rec (|FSharpList|_|) (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     match obj with
     | :? IEnumerable as enumerable when FSharpType.isList (obj.GetType()) ->
         Some(
             enumerable
             |> Seq.cast<obj>
-            |> Seq.map (fromNative env)
+            |> Seq.map (fromNative ctx env)
             |> Seq.toList
         )
     | _ -> None
 
-and (|FSharpArray|_|) (env: Env<Value>) (obj: obj) =
+and (|FSharpArray|_|) (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     match obj with
     | :? Array as array ->
         Some(
             array
             |> Seq.cast<obj>
-            |> Seq.map (fromNative env)
+            |> Seq.map (fromNative ctx env)
             |> Seq.toList
         )
     | _ -> None
 
-and (|FSharpRecord|_|) (env: Env<Value>) (obj: obj) =
+and (|FSharpRecord|_|) (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     let isRecordType typ =
         FSharpType.IsRecord(typ, BindingFlags.Public ||| BindingFlags.NonPublic)
 
@@ -39,7 +39,7 @@ and (|FSharpRecord|_|) (env: Env<Value>) (obj: obj) =
         let fields =
             FSharpType.GetRecordFields(typeOfObj, BindingFlags.Public ||| BindingFlags.NonPublic)
             |> Array.map (fun fieldInfo ->
-                KeyValuePair(Value.Str(fieldInfo.Name), fromNative env (fieldInfo.GetValue(obj)))
+                KeyValuePair(Value.Str(fieldInfo.Name), fromNative ctx env (fieldInfo.GetValue(obj)))
             )
 
         Some(Dictionary(fields))
@@ -63,21 +63,21 @@ and (|FSharpUnion|_|) (obj: obj) =
     else
         None
 
-and (|FSharpSome|_|) (env: Env<Value>) (obj: obj) =
+and (|FSharpSome|_|) (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     if FSharpValue.isSome obj then
-        FSharpValue.getSomeValue obj |> fromNative env |> Some
+        FSharpValue.getSomeValue obj |> fromNative ctx env |> Some
     else
         None
 
-and (|FSharpFunction|_|) (env: Env<Value>) (obj: obj) =
+and (|FSharpFunction|_|) (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     let t = obj.GetType()
 
     if not <| FSharpType.IsFunction t then
         None
     else
-        Some <| fromNativeFunction env obj
+        Some <| fromNativeFunction ctx env obj
 
-and fromNativeFunction (env: Env<Value>) (obj: obj) =
+and fromNativeFunction (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     let t = obj.GetType()
 
     let nativeName = t.Name.Split("@")[0]
@@ -99,28 +99,28 @@ and fromNativeFunction (env: Env<Value>) (obj: obj) =
             match values with
             | [] -> failwith $"Not enough arguments for function `${nativeName}`"
             | v :: restValues ->
-                (fromValueBoxed env t v)
+                (fromValueBoxed ctx env t v)
                 :: (typeCheck env restValues restTypes)
 
-    let fn (env: Env<Value>) (values: Value list) : Value =
+    let fn (ctx: Context<Value>) (env: Env<Value>) (values: Value list) (k: Value -> Value) : Value =
 
         let checkedValues = typeCheck env values inputs
 
         let ret = FSharpValue.dynamicInvoke obj checkedValues
 
-        fromNative env ret
+        fromNative ctx env ret |> k
 
     fn
 
-and (|CSharpFunction|_|) (env: Env<Value>) (obj: obj) =
+and (|CSharpFunction|_|) (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     let t = obj.GetType()
 
     if CSharpType.isFunction t then
-        Some <| fromNativeFunc env obj
+        Some <| fromNativeFunc ctx env obj
     else
         None
 
-and fromNativeFunc (env: Env<Value>) (obj: obj) =
+and fromNativeFunc (ctx: Context<Value>) (env: Env<Value>) (obj: obj) =
     let t = obj.GetType()
 
     let nativeName = t.Name.Split("@")[0]
@@ -147,20 +147,20 @@ and fromNativeFunc (env: Env<Value>) (obj: obj) =
             match values with
             | [] -> failwith $"Not enough arguments for function `${nativeName}`"
             | v :: restValues ->
-                (fromValueBoxed env t v)
+                (fromValueBoxed ctx env t v)
                 :: (typeCheck env restValues restTypes)
 
-    let fn (env: Env<Value>) (values: Value list) : Value =
+    let fn (ctx: Context<Value>) (env: Env<Value>) (values: Value list) (k: Value -> Value) : Value =
 
         let checkedValues = typeCheck env values inputs |> Seq.toArray
 
         let ret = (obj :?> Delegate).DynamicInvoke(checkedValues)
 
-        fromNative env ret
+        fromNative ctx env ret |> k
 
     fn
 
-and fromNative (env: Env<Value>) (obj: obj) : Value =
+and fromNative (ctx: Context<Value>) (env: Env<Value>) (obj: obj) : Value =
     match obj with
     | :? Value -> obj :?> Value
     | :? unit -> Value.Nil // Also matches None
@@ -168,16 +168,16 @@ and fromNative (env: Env<Value>) (obj: obj) : Value =
     | :? int as n -> Value.Num(float n)
     | :? float as n -> Value.Num n
     | :? string as s -> Value.Str s
-    | FSharpList env items -> Value.List items
-    | FSharpArray env items -> Value.List items
-    | FSharpRecord env items -> items |> Seq.map (|KeyValue|) |> Map.ofSeq |> Value.Table
+    | FSharpList ctx env items -> Value.List items
+    | FSharpArray ctx env items -> Value.List items
+    | FSharpRecord ctx env items -> items |> Seq.map (|KeyValue|) |> Map.ofSeq |> Value.Table
     | FSharpUnion caseName -> Value.Str caseName
-    | FSharpSome env value -> value
-    | FSharpFunction env fn -> Value.Closure(fn)
-    | CSharpFunction env fn -> Value.Closure(fn)
+    | FSharpSome ctx env value -> value
+    | FSharpFunction ctx env fn -> Value.Closure(fn)
+    | CSharpFunction ctx env fn -> Value.Closure(fn)
     | _ -> Value.Nil
 
-and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =
+and fromValueBoxed (ctx: Context<Value>) (env: Env<Value>) (t: Type) (v: Value) : obj =
     match t with
     | t when t = typeof<Value> -> box v
 
@@ -213,7 +213,7 @@ and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =
         | Value.List items ->
 
             items
-            |> List.map (fromValueBoxed env elementsType)
+            |> List.map (fromValueBoxed ctx env elementsType)
             |> FSharpValue.makeList elementsType
 
         | _ -> failwith "Type mismatch for list"
@@ -227,7 +227,7 @@ and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =
             let elementsType = t.GetElementType()
 
             items
-            |> Seq.map (fromValueBoxed env elementsType)
+            |> Seq.map (fromValueBoxed ctx env elementsType)
             |> FSharpValue.makeArray elementsType
         | _ -> failwith "Type mismatch for Array"
     | t when FSharpType.isOption t ->
@@ -236,7 +236,7 @@ and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =
         match v with
         | Value.Nil -> FSharpValue.makeNone elementsType
         | v ->
-            let boxedValue = fromValueBoxed env elementsType v
+            let boxedValue = fromValueBoxed ctx env elementsType v
             FSharpValue.makeSome elementsType boxedValue
     | t when
         FSharpType.IsUnion(t, BindingFlags.Public ||| BindingFlags.NonPublic)
@@ -273,7 +273,7 @@ and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =
                     let fieldValue = Map.tryFind key table
 
                     match fieldValue with
-                    | Some value -> fromValueBoxed env typ value
+                    | Some value -> fromValueBoxed ctx env typ value
                     | None -> // Special cases for option, list and array
                         if FSharpType.isOption typ then
                             FSharpValue.makeNone typ.GenericTypeArguments[0]
@@ -297,10 +297,10 @@ and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =
 
                 let fn: obj -> obj =
                     fun i ->
-                        let args = args @ [ i |> fromNative env ]
+                        let args = args @ [ i |> fromNative ctx env ]
 
                         if isLast then
-                            handler env args |> fromValueBoxed env output
+                            handler ctx env args id |> fromValueBoxed ctx env output
                         else
                             makeFn output args
 
@@ -311,6 +311,6 @@ and fromValueBoxed (env: Env<Value>) (t: Type) (v: Value) : obj =
         | _ -> failwith "Type mismatch for Function"
     | _ -> failwith $"Unsupported native type for conversion: {t}"
 
-and fromValue<'T> (env: Env<Value>) (v: Value) : 'T =
-    let boxedValue = fromValueBoxed env typeof<'T> v
+and fromValue<'T> (ctx: Context<Value>) (env: Env<Value>) (v: Value) : 'T =
+    let boxedValue = fromValueBoxed ctx env typeof<'T> v
     unbox<'T> boxedValue

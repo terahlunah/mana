@@ -31,9 +31,7 @@ let repl () =
 let run path args =
     try
         let m = Mana()
-        // m.setValue ("args", args |> List.map Value.Str |> Value.List)
-        let n = args |> List.head |> float |> Value.Num
-        m.setValue ("n", n)
+        m.setValue ("args", args |> List.map Value.Str |> Value.List)
 
         let code = File.ReadAllText path
 

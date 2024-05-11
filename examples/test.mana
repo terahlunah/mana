@@ -1,0 +1,19 @@
+
+
+spawn {
+    print "hello from coroutine"
+    
+    suspend
+    
+    print "hello again from coroutine"
+}
+
+print "hello from main function"
+
+suspend
+
+print "hello again from main function"
+
+suspend
+
+print "goodbye"

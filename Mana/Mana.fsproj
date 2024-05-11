@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <Compile Include="Utils.fs"/>
+        <Compile Include="Cont.fs"/>
         <Compile Include="Span.fs"/>
         <Compile Include="Token.fs"/>
         <Compile Include="Error.fs"/>
@@ -18,6 +19,7 @@
         <Compile Include="Ast.fs"/>
         <Compile Include="Parser.fs"/>
         <Compile Include="Env.fs"/>
+        <Compile Include="Context.fs"/>
         <Compile Include="Value.fs"/>
         <Compile Include="Compiler.fs"/>
         <Compile Include="Builtins.fs"/>

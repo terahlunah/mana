@@ -3,11 +3,17 @@ module Mana.Compiler
 open Mana
 open Mana.Error
 open Microsoft.FSharp.Core
-open Mana.Pattern
+open Mana.Cont
 
-type Callable = Env<Value> -> Value
+type Executor = Context<Value> -> Env<Value> -> (Value -> Value) -> Value
 
-// Execution functions
+// Utils
+
+module List =
+    let rec mapK f l k =
+        match l with
+        | [] -> k []
+        | x :: xs -> f x (fun r -> mapK f xs (fun rs -> k (r :: rs)))
 
 let rec bindPattern (env: Env<Value>) (value: Value) (pattern: Pattern) : bool =
     match pattern with
@@ -22,134 +28,158 @@ let rec bindPattern (env: Env<Value>) (value: Value) (pattern: Pattern) : bool =
     | Pattern.List patterns ->
         match value with
         | Value.List values ->
-            
+
             if not <| Pattern.isCollectionPatternValid patterns then
                 raiseError ManaError.MoreThanOneRestPattern
-                
+
             if Pattern.matchesSize values.Length patterns then
                 let restSize = values.Length - Pattern.minimumSize patterns
-                
+
                 let rec bindList vs ps =
                     match vs, ps with
                     | [], [] -> true
-                    | v::vs, Single p::ps ->
-                        bindPattern env v p && bindList vs ps
-                    | vs, Rest p::ps ->
+                    | v :: vs, Single p :: ps -> bindPattern env v p && bindList vs ps
+                    | vs, Rest p :: ps ->
                         let rest = vs |> List.take restSize
-                        env.set(p, Value.List rest)
+                        env.set (p, Value.List rest)
                         bindList (vs |> List.skip restSize) ps
                     | _ -> false
-                    
+
                 bindList values patterns
             else
                 false
         | _ -> false
     | Pattern.Table patterns -> failwith "todo"
 
-let execNil (env: Env<Value>) = Value.Nil
-let execBool b (env: Env<Value>) = Value.Bool b
-let execNum n (env: Env<Value>) = Value.Num n
-let execStr s (env: Env<Value>) = Value.Str s
+// Execution functions
 
-let execBlock body (env: Env<Value>) =
-    body
-    |> List.map (fun e -> e env)
-    |> List.tryLast
-    |> Option.defaultValue Value.Nil
-    
-let execAssign symbol value (env: Env<Value>) =
-    let v = value env
-    
-    if env.globalAssign(symbol, v) then
-        Value.Nil
+let execBlock (body: Executor list) (ctx:Context<Value>) (env: Env<Value>) = cps {
+    let! rs = body |> List.mapK (fun e -> e ctx env)
+    return rs |> List.tryLast |> Option.defaultValue Value.Nil
+}
+
+let execAssign symbol (valueExec: Executor) (ctx:Context<Value>) (env: Env<Value>) = cps {
+    let! v = valueExec ctx env
+
+    if env.globalAssign (symbol, v) then
+        return Value.Nil
     else
-        raiseError (ManaError.SymbolNotFound symbol)
-        
-let execLet pattern value (env: Env<Value>) =
-    let v = value env
+        return raiseError (ManaError.SymbolNotFound symbol)
+}
 
-    let letEnv = env.localScope ("let")
+let execLet pattern (valueExec: Executor) (ctx:Context<Value>) (env: Env<Value>) = cps {
+    let! v = valueExec ctx env
+
+    let letEnv = env.localScope "let"
 
     if bindPattern letEnv v pattern then
         env.merge letEnv
-        Value.Nil
+        return Value.Nil
     else
-        raiseError (ManaError.PatternMatchingFailed)
-    
-let execCall name args (env: Env<Value>) =
+        return raiseError (ManaError.PatternMatchingFailed)
+}
+
+let execCall name args (ctx:Context<Value>) (env: Env<Value>) = cps {
     match (env.get name) with
     | Some(Value.Closure handler) ->
-        let eval e = e env
-        let args = List.map eval args
-        handler env args
-    | Some e -> e
-    | None -> raiseError (ManaError.UnknownSymbol name)
+        let exec e = e ctx env
+        let! args = List.mapK exec args
+        return! handler ctx env args
+    | Some e -> return e
+    | None -> return raiseError (ManaError.UnknownSymbol name)
+}
 
-let execClosure name (paramNames: string list) body (env: Env<Value>) =
-    let closureHandler _ (args: Value list) =
+let execClosure name (paramNames: string list) body (ctx:Context<Value>) (env: Env<Value>) = cps {
+    let closureHandler ctx _ (args: Value list) = cps {
         // Check arity
         if paramNames.Length <> args.Length then
-            raiseError (ManaError.InvalidArgumentCount("closure", args.Length, paramNames.Length))
+            return raiseError (ManaError.InvalidArgumentCount("closure", args.Length, paramNames.Length))
+        else
+            // Prepare env with args
+            let scope = env.localScope name
 
-        // Prepare env with args
-        let scope = env.localScope name
+            List.zip paramNames args |> List.iter scope.set
 
-        for k, v in List.zip paramNames args do
-            scope.set (k, v)
+            return! body ctx scope
+    }
 
-        body scope
-    Value.Closure closureHandler
+    return Value.Closure closureHandler
+}
 
-let execTable items (env: Env<Value>)=
-    let eval (k, v) = k env, v env
-    items |> List.map eval |> Map |> Value.Table
-    
-let execList items (env: Env<Value>)=
-    items
-        |> List.collect
-        (function
-        | Elem e -> e env |> List.singleton
-        | Splat splat ->
-            match splat env with
-            | List l -> l
-            | _ -> raiseError ManaError.OnlyListsCanBeSplatted
-        ) |> Value.List    
-let execMatch value patterns cases (env: Env<Value>)=
-    let v = value env
-        
-    let rec runMatch cases =
+let execTable keys values (ctx:Context<Value>) (env: Env<Value>) = cps {
+    let exec e = e ctx env
+    let! keys = List.mapK exec keys
+    let! values = List.mapK exec values
+    return List.zip keys values |> Map |> Value.Table
+}
+
+let execList items (ctx:Context<Value>) (env: Env<Value>) = cps {
+    let! items =
+        List.mapK
+            (function
+            | Elem executor -> cps {
+                let! e = executor ctx env
+                return List.singleton e
+              }
+            | Splat splat -> cps {
+                let! e = splat ctx env
+
+                match e with
+                | List l -> return l
+                | _ -> return raiseError ManaError.OnlyListsCanBeSplatted
+              })
+            items
+
+    let items = List.concat items
+    return Value.List items
+}
+
+let execMatch valueExecutor patterns cases (ctx:Context<Value>) (env: Env<Value>) = cps {
+    let! v = valueExecutor ctx env
+
+    let rec runMatch cases = cps {
         match cases with
-        | [] -> raiseError (ManaError.PatternMatchingFailed)
-        | (pattern, guard, body)::tail ->
+        | [] -> return raiseError (ManaError.PatternMatchingFailed)
+        | (pattern, guard, body) :: tail ->
             // let caseEnv = env.localScope ($"match case |%A{pattern}|")
             let caseEnv = env.localScope ("match case")
+
             if bindPattern caseEnv v pattern then
-                let guardOk = guard |> Option.map (fun g -> g caseEnv |> Value.isTrue) |> Option.defaultValue true
-                    
+                let! guardOk = 
+                    match guard with
+                    | Some guardExecutor ->
+                        cps {
+                            let! pass = guardExecutor ctx caseEnv
+                            return Value.isTrue pass
+                        }
+                    | None -> cps { return true }
+
                 if guardOk then
                     env.merge caseEnv
-                    body env
+                    return! body ctx env
                 else
-                    runMatch tail
+                    return! runMatch tail
             else
-                runMatch tail
-    
-    runMatch cases
+                return! runMatch tail
+    }
+
+    return! runMatch cases
+}
 
 // Compilation functions
 
-let rec compileCall name args : Callable =
+let rec compileCall name args : Executor =
     let args = compileExprs args
-    
+
     execCall name args
 
-and compileClosure (paramNames: string list) body : Callable =
+and compileClosure (paramNames: string list) body : Executor =
     let body = compileExpr body
     let closureName = $"""closure |{paramNames |> String.concat ","}|"""
 
     execClosure closureName paramNames body
 
-and compileList items : Callable =
+and compileList items : Executor =
     let items =
         items
         |> List.map (
@@ -160,44 +190,43 @@ and compileList items : Callable =
 
     execList items
 
-and compileTable items : Callable =
-    let items =
-        items
-        |> List.map (fun (k, v) -> compileExpr k, compileExpr v)
+and compileTable items : Executor =
+    let keys = items |> List.map (fun (k, _) -> compileExpr k)
+    let values = items |> List.map (fun (_, v) -> compileExpr v)
 
-    execTable items
+    execTable keys values
 
-and compileBlock body : Callable =
+and compileBlock body : Executor =
     let body = compileExprs body
 
     execBlock body
 
-and compileAssign (symbol: string) (value: Ast): Callable =
+and compileAssign (symbol: string) (value: Ast) : Executor =
     let value = compileExpr value
 
     execAssign symbol value
 
-and compileLet (p: Pattern) (value: Ast): Callable =
+and compileLet (p: Pattern) (value: Ast) : Executor =
     let value = compileExpr value
 
     execLet p value
 
-and compileMatch (value: Ast) (cases: MatchCase list) : Callable =
+and compileMatch (value: Ast) (cases: MatchCase list) : Executor =
     let value = compileExpr value
-    
+
     let patterns = cases |> List.map _.pattern
     let conds = cases |> List.map _.guard |> List.map (Option.map compileExpr)
     let bodies = cases |> List.map _.body |> compileExprs
     let cases = List.zip3 patterns conds bodies
-    
+
     execMatch value patterns cases
 
-and compileExpr (expr: Ast) : Callable =
+and compileExpr (expr: Ast) : Executor =
     match expr with
-    | Ast.Nil -> execNil
-    | Ast.Bool b -> execBool b
-    | Ast.Num n -> execNum n
-    | Ast.Str s -> execStr s
+    | Ast.Nil -> fun _ _ -> cps { return Value.Nil }
+    | Ast.Bool b -> fun _ _ -> cps { return Value.Bool b }
+    | Ast.Num n -> fun _ _ -> cps { return Value.Num n }
+    | Ast.Str s -> fun _ _ -> cps { return Value.Str s }
     | Ast.Call(name, args) -> compileCall name args
     | Ast.Closure(args, body) -> compileClosure args body
     | Ast.List items -> compileList items
@@ -205,7 +234,10 @@ and compileExpr (expr: Ast) : Callable =
     | Ast.Block body -> compileBlock body
     | Ast.Assign(symbol, value) -> compileAssign symbol value
     | Ast.Let(pattern, value) -> compileLet pattern value
-    | Ast.Match(value, cases) -> compileMatch value cases
+    | Ast.Match(value, cases) ->  compileMatch value cases
 
-and compileExprs exprs : Callable list = List.map compileExpr exprs
+and compileExprs exprs : Executor list = List.map compileExpr exprs
 
+let compile (expr: Ast) =
+    let executor = compileExpr expr
+    fun ctx env -> executor ctx env id

@@ -1,6 +1,8 @@
 ﻿[<AutoOpen>]
 module Mana.Utils
 
+open System.Collections.Generic
+
 let inline todo msg = failwith $"TODO: %s{msg}"
 
 module String =
@@ -16,3 +18,10 @@ module Option =
         match o with
         | Some t -> t
         | None -> error |> raise
+
+module Queue =
+
+    let tryDequeue (queue: Queue<'T>) : 'T option =
+        match queue.TryDequeue() with
+        | true, v -> Some v
+        | _ -> None

@@ -12,7 +12,7 @@ Value Add1(Env<Value> env, List<Value> args) =>
         _ => throw new ArgumentException("Arguments must be numbers")
     };
 
-double Add2(double a, double b) => a + b;
+var Add2 = (double a, double b) => a + b;
 
 m.setValue("add1", Value.NewFuncClosure(Add1));
 m.setValue("add2", m.toValue<Func<double, double, double>>(Add2));
