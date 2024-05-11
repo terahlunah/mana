@@ -8,7 +8,7 @@ type Channel<'T> = {
     mutable closed: bool
     capacity: int
     buffer: Queue<'T>
-    sendQueue: Queue<('T -> 'T) * 'T>
+    sendQueue: Queue<(unit -> 'T) * 'T>
     recvQueue: Queue<'T -> 'T>
 } with
 
@@ -16,7 +16,7 @@ type Channel<'T> = {
         closed = false
         capacity = size
         buffer = Queue<'T>()
-        sendQueue = Queue<('T -> 'T) * 'T>()
+        sendQueue = Queue<(unit -> 'T) * 'T>()
         recvQueue = Queue<'T -> 'T>()
     }
 
@@ -35,7 +35,7 @@ type Channel<'T> = {
     member this.SendDequeue() = Queue.tryDequeue this.sendQueue
     member this.SendEnqueue co v = this.sendQueue.Enqueue(co, v)
 
-and Coroutine<'T> = ('T -> 'T) -> 'T
+and Coroutine<'T> = unit -> 'T
 
 type Context<'T>() =
     let queue = Queue<Coroutine<'T>>()
@@ -53,9 +53,9 @@ type Context<'T>() =
         | true, co -> Some co
         | _ -> None
 
-    member this.RunNextCoroutine k =
+    member this.RunNextCoroutine() =
         match this.GetNextCoroutine() with
-        | Some co -> co k
+        | Some co -> co ()
         | None -> failwith "no more coroutine to run"
 
     member this.CloseChannel(channel: Channel<'T>) =

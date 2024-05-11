@@ -5,6 +5,8 @@ open Mana.Cont
 open Mana.Error
 open System
 
+let discard _ = Value.Nil
+
 // Env
 
 let __env (env: Env<Value>) _ =
@@ -28,14 +30,13 @@ let __env_name (env: Env<Value>) _ = env.name |> Value.Str
 let co_spawn (ctx: Context<Value>) env args = cps {
     match args with
     | [ Closure handler ] ->
-        let cont = cps {
+        let co () =
             // Discard coroutine return
-            let! _ = handler ctx env []
+            handler ctx env [] discard |> ignore
             // We need to run the remaining coroutines after this one finishes
-            return ctx.RunNextCoroutine(fun _ -> Value.Nil)
-        }
+            ctx.RunNextCoroutine()
 
-        ctx.ScheduleCoroutine(cont)
+        ctx.ScheduleCoroutine(co)
         return Value.Nil
     | _ -> return raiseError (ManaError.InvalidArguments "invalid `spawn` arguments")
 }
@@ -43,10 +44,17 @@ let co_spawn (ctx: Context<Value>) env args = cps {
 let co_suspend (ctx: Context<Value>) env args (k: Value -> Value) =
     match args with
     | [] ->
-        let cont _ = k Value.Nil
-        ctx.ScheduleCoroutine(cont)
-        ctx.RunNextCoroutine(fun _ -> Value.Nil)
+        let co () = k Value.Nil
+        ctx.ScheduleCoroutine(co)
+        ctx.RunNextCoroutine()
     | _ -> raiseError (ManaError.InvalidArguments "invalid `suspend` arguments")
+
+let ch_new (ctx: Context<Value>) env args = cps {
+    match args with
+    | [] -> return Channel.Create 0 |> Value.Channel
+    | [ Num n ] -> return Channel.Create(int n) |> Value.Channel
+    | _ -> return raiseError (ManaError.InvalidArguments "invalid `channel` arguments")
+}
 
 let ch_close (ctx: Context<Value>) env args = cps {
     match args with
@@ -61,15 +69,15 @@ let ch_recv (ctx: Context<Value>) env args k =
     | [ Channel c ] ->
         match c.SendDequeue(), c.BufDequeue() with
         | Some(s, sv), None ->
-            ctx.ScheduleCoroutine(cps { return s Value.Nil })
+            ctx.ScheduleCoroutine(s)
             k sv
         | Some(s, sv), Some v ->
             c.BufEnqueue sv
-            ctx.ScheduleCoroutine(cps { return s Value.Nil })
+            ctx.ScheduleCoroutine(s)
             k v
         | None, None when c.CanRecv() ->
             c.RecvEnqueue k
-            ctx.RunNextCoroutine(fun _ -> Value.Nil)
+            ctx.RunNextCoroutine()
         | None, None -> failwith "Channel receive queue is full"
         | None, Some v -> k v
     | _ -> raiseError (ManaError.InvalidArguments "invalid `recv` arguments")
@@ -79,14 +87,14 @@ let ch_send (ctx: Context<Value>) env args k =
     | [ Channel c; v ] ->
         match c.RecvDequeue() with
         | Some r ->
-            ctx.ScheduleCoroutine(cps { return r v })
+            ctx.ScheduleCoroutine(fun _ -> r v)
             k Value.Nil
         | None when not (c.IsFull()) ->
             c.BufEnqueue v
             k Value.Nil
         | None when c.CanSend() ->
-            c.SendEnqueue k v
-            ctx.RunNextCoroutine(fun _ -> Value.Nil)
+            c.SendEnqueue (fun _ -> k Value.Nil) v
+            ctx.RunNextCoroutine()
         | None -> failwith "Channel send queue is full"
 
     | _ -> raiseError (ManaError.InvalidArguments "invalid `send` arguments")
@@ -364,7 +372,11 @@ let toNum env args =
     | _ -> raiseError (ManaError.InvalidArguments "`num` only takes 1 argument")
 
 let bind name f =
-    let kf = fun ctx env args k -> k (f env args)
+    let kf =
+        fun ctx env args k ->
+            // printfn $"debug call {name}"
+            k (f env args)
+
     Env.set name (Value.Closure(kf))
 
 let bindRaw name f = Env.set name (Value.Closure(f))
@@ -375,9 +387,15 @@ let env: Env<Value> =
     // Meta
     |> bind "__env" __env
 
-    // Corountines
+    // Coroutines
     |> bindRaw "spawn" co_spawn
     |> bindRaw "suspend" co_suspend
+
+    // Channels
+    |> bindRaw "channel" ch_new
+    |> bindRaw "close" ch_close
+    |> bindRaw "send" ch_send
+    |> bindRaw "recv" ch_recv
 
     // Arithmetic
     |> Env.set "pi" (Value.Num Math.PI)

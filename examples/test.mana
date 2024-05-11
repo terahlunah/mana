@@ -1,19 +1,11 @@
 
 
+let c = channel()
+
 spawn {
-    print "hello from coroutine"
-    
-    suspend
-    
-    print "hello again from coroutine"
+    c.send 1
+    c.send 2
 }
 
-print "hello from main function"
-
-suspend
-
-print "hello again from main function"
-
-suspend
-
-print "goodbye"
+c.recv.print
+c.recv.print

@@ -8,4 +8,4 @@ let fact2 = { |x|
     | x -> x * fact2 (x-1)
 }
 
-fact2 n
+args.head.num.fact2
