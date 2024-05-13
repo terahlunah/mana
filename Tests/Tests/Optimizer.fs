@@ -17,6 +17,6 @@ let (==) code expected = testOptimize code expected
 let optimizerTests =
 
     testGroup "optimizer" [
-        test "constant" { "3 + 2 * 4" == Ast.Num 11 }
-        test "single expr block" { "(0)" == Ast.Num 0 }
+        test "constant" { "3 + 2 * 4" == Expr.Num 11 }
+        test "single expr block" { "(0)" == Expr.Num 0 }
     ]

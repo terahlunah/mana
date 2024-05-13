@@ -3,6 +3,7 @@
 open Mana
 open Mana.Error
 open Mana.Utils
+open Mana.Optimizer
 
 type Parser(tokens: Token list) =
     let tokens = tokens
@@ -115,6 +116,7 @@ type Parser(tokens: Token list) =
         | Operator
         | Pipe
         | Dot
+        | QuestionDot
         | Eof -> true
         | _ -> false
 
@@ -263,9 +265,9 @@ type Parser(tokens: Token list) =
 
         this.parseList (fun _ ->
             if this.is TokenKind.DoubleDot then
-                this.parseSplat () |> ListExpr.Splat
+                this.parseSplat () |> ListItem.Splat
             else
-                this.parseExpr () |> ListExpr.Elem
+                this.parseExpr () |> ListItem.Elem
         )
         |> Ast.List
 
@@ -451,10 +453,6 @@ type Parser(tokens: Token list) =
                 )
             )
 
-        // Add Implicit "it" argument when needed
-        if args.Length = 0 && Ast.useImplicitIt body then
-            args <- [ "it" ]
-
         Ast.Closure(args, body |> Ast.Block)
 
     member this.parseElement(insideCall: bool) : Ast =
@@ -536,7 +534,7 @@ type Parser(tokens: Token list) =
             Pattern.Nil
         | TokenKind.Wildcard ->
             this.skip TokenKind.Wildcard
-            Pattern.Wildcard
+            Pattern.Any
         | TokenKind.Bool ->
             let p = this.expect TokenKind.Bool
             p |> Token.asBool |> Option.get |> Pattern.Bool
@@ -558,7 +556,7 @@ type Parser(tokens: Token list) =
     member this.parseExpr(p: int, insideCall: bool) : Ast =
         let mutable left = this.parseElement insideCall
 
-        // Chain operator
+        // Chain operators
         let rec chain left =
             if this.trySkip TokenKind.Dot then
                 if this.is TokenKind.Symbol then
@@ -570,6 +568,31 @@ type Parser(tokens: Token list) =
                 else
                     raiseError (ManaError.ExpectedSymbol(this.current().kind))
 
+            elif this.trySkip TokenKind.QuestionDot then
+                if this.is TokenKind.Symbol then
+                    match this.parseCall (false) with
+                    | Ast.Call(name, args) ->
+                        let left =
+                            Ast.Match(
+                                left,
+                                [
+                                    {
+                                        pattern = Pattern.Nil
+                                        body = Ast.Nil
+                                        guard = None
+                                    }
+                                    {
+                                        pattern = Pattern.Symbol "x"
+                                        body = Ast.Call(name, Ast.Call("x", []) :: args)
+                                        guard = None
+                                    }
+                                ]
+                            )
+
+                        chain left
+                    | _ -> failwith "unreachable"
+                else
+                    raiseError (ManaError.ExpectedSymbol(this.current().kind))
             else
                 left
 
@@ -588,7 +611,7 @@ type Parser(tokens: Token list) =
                     | Right -> op.precedence
 
                 let right = this.parseExpr (q, insideCall)
-                let e = Ast.Call(op.handler, [ left; right ])
+                let e = Ast.Binop(op, left, right)
                 loop e
             | None -> left
 
@@ -599,5 +622,5 @@ module Parser =
     let parseExprRaw tokens = Parser(tokens).parseExpr ()
     let parseManyRaw tokens = Parser(tokens).parseMany ()
 
-    let parseExpr = parseExprRaw >> Ast.optimize
-    let parseMany = parseManyRaw >> Ast.optimize
+    let parseExpr = parseExprRaw >> desugar >> optimize
+    let parseMany = parseManyRaw >> desugar >> optimize

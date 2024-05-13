@@ -22,9 +22,6 @@ type Channel<'T> = {
 
     member this.IsFull() = this.buffer.Count = this.capacity
 
-    member this.CanRecv() = this.recvQueue.Count < 4
-    member this.CanSend() = this.sendQueue.Count < 4
-
     member this.BufDequeue() = Queue.tryDequeue this.buffer
 
     member this.BufEnqueue v = this.buffer.Enqueue v
@@ -35,17 +32,10 @@ type Channel<'T> = {
     member this.SendDequeue() = Queue.tryDequeue this.sendQueue
     member this.SendEnqueue co v = this.sendQueue.Enqueue(co, v)
 
-and Coroutine<'T> = unit -> 'T
+type Coroutine<'T> = unit -> 'T
 
 type Context<'T>() =
     let queue = Queue<Coroutine<'T>>()
-
-    // This can be used to implement
-    // - try catch : raise
-    // - seq : yield
-    // - proc : early return
-    let effectHandlers = Stack<unit>()
-
     member this.ScheduleCoroutine(co: Coroutine<'T>) = queue.Enqueue co
 
     member this.GetNextCoroutine() =

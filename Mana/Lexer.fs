@@ -15,7 +15,7 @@ type Lexer(source: string) =
         ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c = '_'
 
     let isSymbol (c: char) : bool =
-        ('0' <= c && c <= '9') || c = '?' || isSymbolHead c
+        ('0' <= c && c <= '9') || isSymbolHead c
 
     let isOperator (c: char) : bool =
         c = '='
@@ -27,7 +27,7 @@ type Lexer(source: string) =
         || c = '<'
         || c = '^'
         || c = '%'
-        // || c = '?'
+        || c = '?'
         || c = '!'
         || c = ':'
         || c = '~'
@@ -278,6 +278,7 @@ type Lexer(source: string) =
         | ":" -> this.token TokenKind.Colon
         | "->" -> this.token TokenKind.RightArrow
         | "." -> this.token TokenKind.Dot
+        | "?." -> this.token TokenKind.QuestionDot
         | ".." -> this.token TokenKind.DoubleDot
         | _ -> this.token TokenKind.Operator |> Token.withStr op
         |> this.emit

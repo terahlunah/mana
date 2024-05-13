@@ -37,18 +37,6 @@ module UnaryOperator =
 module BinaryOperator =
     let binary = [
         {
-            symbol = "+"
-            handler = "__add"
-            precedence = 50
-            associativity = Left
-        }
-        {
-            symbol = "-"
-            handler = "__sub"
-            precedence = 50
-            associativity = Left
-        }
-        {
             symbol = "*"
             handler = "__mul"
             precedence = 60
@@ -70,6 +58,24 @@ module BinaryOperator =
             symbol = "%"
             handler = "__mod"
             precedence = 60
+            associativity = Left
+        }
+        {
+            symbol = "+"
+            handler = "__add"
+            precedence = 50
+            associativity = Left
+        }
+        {
+            symbol = "-"
+            handler = "__sub"
+            precedence = 50
+            associativity = Left
+        }
+        {
+            symbol = "++"
+            handler = "concat"
+            precedence = 50
             associativity = Left
         }
         {
@@ -121,9 +127,9 @@ module BinaryOperator =
             associativity = Left
         }
         {
-            symbol = "++"
-            handler = "concat"
-            precedence = 10
+            symbol = "?:"
+            handler = "sugar"
+            precedence = 20
             associativity = Left
         }
     ]

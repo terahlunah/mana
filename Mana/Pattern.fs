@@ -8,7 +8,7 @@ type Pattern =
     | Symbol of s: string
     | List of ListPatternItem list
     | Table of TablePatternItem list
-    | Wildcard
+    | Any
 
 and CollectionPatternItem<'T> =
     | Single of item: 'T
@@ -17,6 +17,16 @@ and CollectionPatternItem<'T> =
 and ListPatternItem = CollectionPatternItem<Pattern>
 
 and TablePatternItem = CollectionPatternItem<Pattern * Pattern>
+
+type ListItem<'T> =
+    | Elem of elem: 'T
+    | Splat of splat: 'T
+
+type MatchCase<'T> = {
+    pattern: Pattern
+    guard: 'T option
+    body: 'T
+}
 
 module Pattern =
 

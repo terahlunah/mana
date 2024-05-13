@@ -75,10 +75,9 @@ let ch_recv (ctx: Context<Value>) env args k =
             c.BufEnqueue sv
             ctx.ScheduleCoroutine(s)
             k v
-        | None, None when c.CanRecv() ->
+        | None, None ->
             c.RecvEnqueue k
             ctx.RunNextCoroutine()
-        | None, None -> failwith "Channel receive queue is full"
         | None, Some v -> k v
     | _ -> raiseError (ManaError.InvalidArguments "invalid `recv` arguments")
 
@@ -92,10 +91,9 @@ let ch_send (ctx: Context<Value>) env args k =
         | None when not (c.IsFull()) ->
             c.BufEnqueue v
             k Value.Nil
-        | None when c.CanSend() ->
+        | None ->
             c.SendEnqueue (fun _ -> k Value.Nil) v
             ctx.RunNextCoroutine()
-        | None -> failwith "Channel send queue is full"
 
     | _ -> raiseError (ManaError.InvalidArguments "invalid `send` arguments")
 
@@ -223,6 +221,16 @@ let condIfElse ctx env args = cps {
 }
 
 let condWhen ctx env args = cps {
+    match args with
+    | [ cond; Closure body ] ->
+        if Value.isTrue cond then
+            return! body ctx env []
+        else
+            return Value.Nil
+    | _ -> return raiseError (ManaError.InvalidArguments "invalid `when` arguments")
+}
+
+let nullCoalescing ctx env args = cps {
     match args with
     | [ cond; Closure body ] ->
         if Value.isTrue cond then
@@ -426,6 +434,7 @@ let env: Env<Value> =
     |> bindRaw "cond" cond
     |> bindRaw "if" condIfElse
     |> bindRaw "when" condWhen
+    |> bindRaw "__null_coalescing" nullCoalescing
 
     // Seq
     |> bind "concat" concat
@@ -438,13 +447,13 @@ let env: Env<Value> =
     |> bind "contains" contains
 
     // Predicates
-    |> bind "nil?" isNil
-    |> bind "bool?" isBool
-    |> bind "num?" isNum
-    |> bind "str?" isStr
-    |> bind "list?" isList
-    |> bind "table?" isTable
-    |> bind "fn?" isFn
+    |> bind "is_nil" isNil
+    |> bind "is_bool" isBool
+    |> bind "is_num" isNum
+    |> bind "is_str" isStr
+    |> bind "is_list" isList
+    |> bind "is_table" isTable
+    |> bind "is_fn" isFn
 
     // Conversions
     |> bind "num" toNum

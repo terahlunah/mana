@@ -22,6 +22,7 @@ type TokenKind =
     | Operator
     | Wildcard
     | Dot
+    | QuestionDot
     | DoubleDot
     | RightArrow
     | LeftArrow

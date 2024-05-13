@@ -4,14 +4,22 @@ open System.Collections.Generic
 
 type Env<'T> = {
     name: string
-    mutable bindings: Dictionary<string, 'T>
+    bindings: Dictionary<string, 'T>
     mutable parent: Env<'T> option
+    // This can be used to implement
+    // - try catch : raise
+    // - seq : yield
+    // - proc : early return
+    // - while/for : break
+    effectHandlers: Stack<unit>
+
 } with
 
     static member empty<'T>(name) : Env<'T> = {
         name = name
         bindings = Dictionary<string, 'T>()
         parent = None
+        effectHandlers = Stack<unit>() 
     }
 
     member self.localScope(name) = { Env<'T>.empty (name) with parent = Some self }
@@ -60,19 +68,6 @@ type Env<'T> = {
         this.name :: (this.parent |> Option.map _.scopes() |> Option.defaultValue [])
 
 module Env =
-    let merge e1 e2 =
-        let newBindings = Dictionary<string, 'T>(e1.bindings)
-
-        for KeyValue(k, v) in e2.bindings do
-            newBindings.[k] <- v
-
-        {
-            name = e1.name
-            bindings = newBindings
-            parent = None
-        }
-
-    let get k (env: Env<_>) = env.get k
 
     let set k v (env: Env<_>) =
         env.set (k, v)

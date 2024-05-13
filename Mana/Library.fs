@@ -38,7 +38,7 @@ type Mana() as this =
         let v = this.toValue value
         this.setValue (name, v)
 
-    member this.parse(code: string) : Ast =
+    member this.parse(code: string) : Expr =
         let tokens = code |> Lexer.lex
         let ast = tokens |> Parser.parseMany
         ast

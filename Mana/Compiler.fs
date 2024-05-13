@@ -17,7 +17,7 @@ module List =
 
 let rec bindPattern (env: Env<Value>) (value: Value) (pattern: Pattern) : bool =
     match pattern with
-    | Pattern.Wildcard -> true
+    | Pattern.Any -> true
     | Pattern.Nil -> value |> Value.isNil
     | Pattern.Bool b -> value |> Value.isBool b
     | Pattern.Num n -> value |> Value.isNum n
@@ -49,7 +49,7 @@ let rec bindPattern (env: Env<Value>) (value: Value) (pattern: Pattern) : bool =
             else
                 false
         | _ -> false
-    | Pattern.Table patterns -> failwith "todo"
+    | Pattern.Table patterns -> todo "Table pattern matching"
 
 // Execution functions
 
@@ -201,17 +201,17 @@ and compileBlock body : Executor =
 
     execBlock body
 
-and compileAssign (symbol: string) (value: Ast) : Executor =
+and compileAssign (symbol: string) (value: Expr) : Executor =
     let value = compileExpr value
 
     execAssign symbol value
 
-and compileLet (p: Pattern) (value: Ast) : Executor =
+and compileLet (p: Pattern) (value: Expr) : Executor =
     let value = compileExpr value
 
     execLet p value
 
-and compileMatch (value: Ast) (cases: MatchCase list) : Executor =
+and compileMatch (value: Expr) (cases: MatchCase<Expr> list) : Executor =
     let value = compileExpr value
 
     let patterns = cases |> List.map _.pattern
@@ -221,23 +221,23 @@ and compileMatch (value: Ast) (cases: MatchCase list) : Executor =
 
     execMatch value patterns cases
 
-and compileExpr (expr: Ast) : Executor =
+and compileExpr (expr: Expr) : Executor =
     match expr with
-    | Ast.Nil -> fun _ _ -> cps { return Value.Nil }
-    | Ast.Bool b -> fun _ _ -> cps { return Value.Bool b }
-    | Ast.Num n -> fun _ _ -> cps { return Value.Num n }
-    | Ast.Str s -> fun _ _ -> cps { return Value.Str s }
-    | Ast.Call(name, args) -> compileCall name args
-    | Ast.Closure(args, body) -> compileClosure args body
-    | Ast.List items -> compileList items
-    | Ast.Table pairs -> compileTable pairs
-    | Ast.Block body -> compileBlock body
-    | Ast.Assign(symbol, value) -> compileAssign symbol value
-    | Ast.Let(pattern, value) -> compileLet pattern value
-    | Ast.Match(value, cases) ->  compileMatch value cases
+    | Expr.Nil -> fun _ _ -> cps { return Value.Nil }
+    | Expr.Bool b -> fun _ _ -> cps { return Value.Bool b }
+    | Expr.Num n -> fun _ _ -> cps { return Value.Num n }
+    | Expr.Str s -> fun _ _ -> cps { return Value.Str s }
+    | Expr.Call(name, args) -> compileCall name args
+    | Expr.Closure(args, body) -> compileClosure args body
+    | Expr.List items -> compileList items
+    | Expr.Table pairs -> compileTable pairs
+    | Expr.Block body -> compileBlock body
+    | Expr.Assign(symbol, value) -> compileAssign symbol value
+    | Expr.Let(pattern, value) -> compileLet pattern value
+    | Expr.Match(value, cases) ->  compileMatch value cases
 
 and compileExprs exprs : Executor list = List.map compileExpr exprs
 
-let compile (expr: Ast) =
+let compile (expr: Expr) =
     let executor = compileExpr expr
     fun ctx env -> executor ctx env id
